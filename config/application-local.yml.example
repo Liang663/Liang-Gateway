@@ -1,0 +1,18 @@
+# Copy this file to application-local.yml in the same directory and fill in real values.
+# application-local.yml is gitignored. Never commit keys, passwords, or tokens.
+
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/liang_gateway?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: your-local-mysql-password
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+gateway:
+  admin-token: change-me-admin-token
+  deepseek:
+    base-url: https://api.deepseek.com/v1
+    api-key: sk-your-deepseek-key

@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+spring:
+  config:
+    import: optional:file:./config/application-local.yml
+
+gateway:
+  proxy:
+    connect-timeout: 5s
+    response-timeout: 120s
+    max-in-memory-size: 16MB

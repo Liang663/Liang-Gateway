@@ -1,0 +1,14 @@
+# Redis only. MySQL runs on the host, not in Docker.
+# Official image: https://hub.docker.com/_/redis
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: liang-gateway-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - liang-gateway-redis-data:/data
+
+volumes:
+  liang-gateway-redis-data:
