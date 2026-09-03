@@ -25,9 +25,6 @@ public class UserAccessTokenEntity {
     @Column(name = "access_token", nullable = false, unique = true, length = 128)
     private String accessToken;
 
-    @Column(name = "apikey_code", nullable = false, length = 64)
-    private String apikeyCode;
-
     @Column(name = "enabled", nullable = false)
     private boolean enabled;
 
@@ -36,12 +33,6 @@ public class UserAccessTokenEntity {
 
     @Column(name = "qpm_limit", nullable = false)
     private int qpmLimit;
-
-    @Column(name = "hourly_token_limit", nullable = false)
-    private long hourlyTokenLimit;
-
-    @Column(name = "weekly_token_limit", nullable = false)
-    private long weeklyTokenLimit;
 
     @Column(name = "create_time", nullable = false)
     private LocalDateTime createTime;
@@ -55,23 +46,17 @@ public class UserAccessTokenEntity {
             String code,
             String userCode,
             String accessToken,
-            String apikeyCode,
             boolean enabled,
             LocalDateTime expireTime,
             int qpmLimit,
-            long hourlyTokenLimit,
-            long weeklyTokenLimit,
             LocalDateTime now) {
         UserAccessTokenEntity entity = new UserAccessTokenEntity();
         entity.code = code;
         entity.userCode = userCode;
         entity.accessToken = accessToken;
-        entity.apikeyCode = apikeyCode;
         entity.enabled = enabled;
         entity.expireTime = expireTime;
         entity.qpmLimit = qpmLimit;
-        entity.hourlyTokenLimit = hourlyTokenLimit;
-        entity.weeklyTokenLimit = weeklyTokenLimit;
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
@@ -93,10 +78,6 @@ public class UserAccessTokenEntity {
         return accessToken;
     }
 
-    public String getApikeyCode() {
-        return apikeyCode;
-    }
-
     public boolean isEnabled() {
         return enabled;
     }
@@ -109,14 +90,6 @@ public class UserAccessTokenEntity {
         return qpmLimit;
     }
 
-    public long getHourlyTokenLimit() {
-        return hourlyTokenLimit;
-    }
-
-    public long getWeeklyTokenLimit() {
-        return weeklyTokenLimit;
-    }
-
     public LocalDateTime getCreateTime() {
         return createTime;
     }
@@ -125,18 +98,10 @@ public class UserAccessTokenEntity {
         return updateTime;
     }
 
-    public void update(
-            boolean enabled,
-            LocalDateTime expireTime,
-            int qpmLimit,
-            long hourlyTokenLimit,
-            long weeklyTokenLimit,
-            LocalDateTime now) {
+    public void update(boolean enabled, LocalDateTime expireTime, int qpmLimit, LocalDateTime now) {
         this.enabled = enabled;
         this.expireTime = expireTime;
         this.qpmLimit = qpmLimit;
-        this.hourlyTokenLimit = hourlyTokenLimit;
-        this.weeklyTokenLimit = weeklyTokenLimit;
         this.updateTime = now;
     }
 

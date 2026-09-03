@@ -11,12 +11,15 @@
 | `docs/spec-gateway-core.md` | core 长期真相源 |
 | `docs/plan-gateway-core.md` | core 第一版落地计划 |
 | `docs/spec-gateway-access.md` | access 长期真相源 |
-| `docs/plan-gateway-access.md` | access 第一版落地计划 |
-| `docs/sql-gateway-user.md` | 用户、访问令牌、大模型 Key 表结构 |
+| `docs/plan-gateway-access.md` | access 第一版落地计划（已完成） |
+| `docs/plan-gateway-access-billing.md` | access 金额限额与模型授权（已完成） |
+| `docs/spec-gateway-ai.md` | ai Chat 长期真相源 |
+| `docs/plan-gateway-ai.md` | ai Chat 第一版落地计划（已完成） |
+| `docs/sql-gateway-user.md` | 用户、令牌、限额、模型、用量、出站日志表结构 |
 | `docs/research-higress-token-limit.md` | Higress Token 限制调研（已吸收，口径以 Spec / SQL 为准） |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
 
-尚未撰写：`spec`/`plan` for ai、orchestration。
+尚未撰写：MCP 的 spec/plan、orchestration 的 spec/plan。
 
 ## 2. 项目约定
 
@@ -25,7 +28,7 @@
 - 单 Maven 模块；根包 `com.liang.gateway`；Modulith 子包即领域。
 - 仅 Spring WebFlux，禁止 `spring-boot-starter-web` 与 Spring Cloud Gateway。
 - `core` / `access` / `ai` 互不依赖；只有 `orchestration` 依赖这三者，且只做编排。
-- Security 只解决能否进网关；额度与 Token 计数在 access，由 orchestration 在调用过程中显式调用。
+- Security 只解决能否进网关；额度与记账在 access，由 orchestration 在调用 ai 前后显式调用。ai 不碰 access。
 - 流式路径禁止 `collectList` / `block`。
 - 禁止提交 `config/application-local.yml`、真实 API Key、数据库密码。
 - 不要 Lombok。不要独立 `llm` / `mcp` / `metering` / `admin` / `infrastructure` 模块。

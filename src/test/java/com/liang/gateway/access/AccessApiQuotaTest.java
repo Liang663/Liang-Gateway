@@ -4,22 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.liang.gateway.access.internal.application.TokenAdminService;
 import com.liang.gateway.access.internal.application.TokenSnapshot;
+import com.liang.gateway.access.internal.application.UsageLimitInput;
 import com.liang.gateway.access.internal.application.UserAdminService;
-import com.liang.gateway.access.internal.infrastructure.AccessClock;
-import com.liang.gateway.access.support.PlaceholderApiKeys;
 import com.liang.gateway.support.MutableClock;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.jdbc.core.JdbcTemplate;
 import reactor.test.StepVerifier;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class AccessApiQuotaTest {
+
+    private static final String MODEL = "deepseek-chat";
 
     @Autowired
     private AccessApi accessApi;
@@ -32,9 +33,6 @@ class AccessApiQuotaTest {
 
     @Autowired
     private MutableClock accessClock;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private ReactiveStringRedisTemplate redis;
@@ -71,7 +69,8 @@ class AccessApiQuotaTest {
         Instant seven = Instant.parse("2026-09-03T07:00:00Z");
         accessClock.setInstant(seven);
         TokenSnapshot token = createToken(60, 50L, 1000L);
-        StepVerifier.create(accessApi.recordUsage(token.code(), 50, 0, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 50, 0, 50, MODEL, UsageMeta.empty()))
+                .verifyComplete();
 
         accessClock.setInstant(Instant.parse("2026-09-03T14:00:00Z"));
         Instant expectedStart = Instant.parse("2026-09-03T12:00:00Z");
@@ -91,9 +90,11 @@ class AccessApiQuotaTest {
         Instant start = Instant.parse("2026-09-03T07:00:00Z");
         accessClock.setInstant(start);
         TokenSnapshot token = createToken(60, 10_000L, 10_000L);
-        StepVerifier.create(accessApi.recordUsage(token.code(), 10, 5, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 10, 5, 15, MODEL, UsageMeta.empty()))
+                .verifyComplete();
         accessClock.setInstant(start.plusSeconds(3_600));
-        StepVerifier.create(accessApi.recordUsage(token.code(), 1, 1, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 1, 1, 2, MODEL, UsageMeta.empty()))
+                .verifyComplete();
 
         StepVerifier.create(accessApi.getQuota(token.code()))
                 .assertNext(view -> {
@@ -109,7 +110,8 @@ class AccessApiQuotaTest {
         Instant start = Instant.parse("2026-09-03T07:00:00Z");
         accessClock.setInstant(start);
         TokenSnapshot token = createToken(60, 100L, 1000L);
-        StepVerifier.create(accessApi.recordUsage(token.code(), 20, 0, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 20, 0, 20, MODEL, UsageMeta.empty()))
+                .verifyComplete();
 
         Instant resetAt = Instant.parse("2026-09-03T09:00:00Z");
         accessClock.setInstant(resetAt);
@@ -130,9 +132,11 @@ class AccessApiQuotaTest {
         Instant start = Instant.parse("2026-09-03T07:00:00Z");
         accessClock.setInstant(start);
         TokenSnapshot token = createToken(60, 10L, 1000L);
-        StepVerifier.create(accessApi.recordUsage(token.code(), 10, 0, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 10, 0, 10, MODEL, UsageMeta.empty()))
+                .verifyComplete();
         StepVerifier.create(accessApi.checkQuota(token.code())).verifyComplete();
-        StepVerifier.create(accessApi.recordUsage(token.code(), 1, 0, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 1, 0, 1, MODEL, UsageMeta.empty()))
+                .verifyComplete();
         StepVerifier.create(accessApi.checkQuota(token.code()))
                 .expectError(QuotaExceededException.class)
                 .verify();
@@ -155,13 +159,14 @@ class AccessApiQuotaTest {
     }
 
     @Test
-    @DisplayName("prompt 与 completion 都是 0 时不写 Redis、不写明细")
+    @DisplayName("prompt、completion 与金额都是 0 时不写 Redis、不写明细")
     void zeroUsageSkipsRedisAndLedger() {
         Instant start = Instant.parse("2026-09-03T07:00:00Z");
         accessClock.setInstant(start);
         TokenSnapshot token = createToken(60, 100L, 1000L);
         String fiveHourKey = "gw:quota:{" + token.code() + "}:5h";
-        StepVerifier.create(accessApi.recordUsage(token.code(), 0, 0, UsageMeta.empty())).verifyComplete();
+        StepVerifier.create(accessApi.recordUsage(token.code(), 0, 0, 0, MODEL, UsageMeta.empty()))
+                .verifyComplete();
         StepVerifier.create(accessApi.getQuota(token.code()))
                 .assertNext(view -> assertThat(view.fiveHour().used()).isZero())
                 .verifyComplete();
@@ -170,12 +175,16 @@ class AccessApiQuotaTest {
                 .verifyComplete();
     }
 
-    private TokenSnapshot createToken(int qpmLimit, long hourlyLimit, long weeklyLimit) {
-        String apikeyCode = "apk_quota_" + System.nanoTime();
-        PlaceholderApiKeys.insert(jdbcTemplate, apikeyCode);
+    private TokenSnapshot createToken(int qpmLimit, long fiveHourFen, long weekFen) {
         var user = userAdminService.create("quota-user", "DATA", true).block();
         return tokenAdminService
-                .create(user.code(), apikeyCode, qpmLimit, hourlyLimit, weeklyLimit, true, null)
+                .create(
+                        user.code(),
+                        qpmLimit,
+                        true,
+                        null,
+                        List.of(MODEL),
+                        List.of(new UsageLimitInput(1, fiveHourFen), new UsageLimitInput(2, weekFen)))
                 .block();
     }
 }

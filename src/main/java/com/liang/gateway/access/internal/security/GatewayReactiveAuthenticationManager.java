@@ -74,8 +74,7 @@ public class GatewayReactiveAuthenticationManager implements ReactiveAuthenticat
                                 if (user == null || !user.isEnabled()) {
                                     return Mono.error(new BadCredentialsException("unauthorized"));
                                 }
-                                AccessPrincipal principal =
-                                        new AccessPrincipal(user.getCode(), token.getCode(), token.getApikeyCode());
+                                AccessPrincipal principal = new AccessPrincipal(user.getCode(), token.getCode());
                                 return Mono.just(AccessAuthenticationToken.authenticated(principal));
                             });
                 });

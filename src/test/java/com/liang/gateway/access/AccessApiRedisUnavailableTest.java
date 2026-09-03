@@ -3,22 +3,22 @@ package com.liang.gateway.access;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.liang.gateway.access.internal.application.TokenAdminService;
+import com.liang.gateway.access.internal.application.UsageLimitInput;
 import com.liang.gateway.access.internal.application.UserAdminService;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenEntity;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserEntity;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserRepository;
-import com.liang.gateway.access.support.PlaceholderApiKeys;
 import com.liang.gateway.support.TestTokens;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -52,9 +52,6 @@ class AccessApiRedisUnavailableTest {
     private UserRepository userRepository;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Autowired
     private WebTestClient webTestClient;
 
     @Test
@@ -77,12 +74,10 @@ class AccessApiRedisUnavailableTest {
     void checkQuotaFailsClosedWhenRedisDown() {
         String userCode = "usr_down_" + System.nanoTime();
         String tokenCode = "tok_down_" + System.nanoTime();
-        String apikeyCode = "apk_chk_" + System.nanoTime();
         LocalDateTime now = LocalDateTime.of(2026, 9, 3, 10, 0, 0);
         userRepository.save(UserEntity.create(userCode, "down-check", "DATA", true, now));
-        PlaceholderApiKeys.insert(jdbcTemplate, apikeyCode);
         tokenRepository.save(UserAccessTokenEntity.create(
-                tokenCode, userCode, "at_down_" + System.nanoTime(), apikeyCode, true, null, 10, 100L, 1000L, now));
+                tokenCode, userCode, "at_down_" + System.nanoTime(), true, null, 10, now));
 
         StepVerifier.create(accessApi.checkQuota(tokenCode))
                 .expectError(QuotaStoreUnavailableException.class)
@@ -92,12 +87,16 @@ class AccessApiRedisUnavailableTest {
     @Test
     @DisplayName("创建令牌时 Redis 失败则库里不留下令牌")
     void createTokenRollsBackWhenRedisDown() {
-        String apikeyCode = "apk_down_" + System.nanoTime();
-        PlaceholderApiKeys.insert(jdbcTemplate, apikeyCode);
         var user = userAdminService.create("down-user", "DATA", true).block();
         assertThat(user).isNotNull();
 
-        StepVerifier.create(tokenAdminService.create(user.code(), apikeyCode, 10, 100L, 1000L, true, null))
+        StepVerifier.create(tokenAdminService.create(
+                        user.code(),
+                        10,
+                        true,
+                        null,
+                        List.of(),
+                        List.of(new UsageLimitInput(1, 100L), new UsageLimitInput(2, 1000L))))
                 .expectError(QuotaStoreUnavailableException.class)
                 .verify(Duration.ofSeconds(8));
 

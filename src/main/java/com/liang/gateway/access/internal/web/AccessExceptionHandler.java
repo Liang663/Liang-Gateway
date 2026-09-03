@@ -1,7 +1,9 @@
 package com.liang.gateway.access.internal.web;
 
+import com.liang.gateway.access.ModelForbiddenException;
 import com.liang.gateway.access.QuotaExceededException;
 import com.liang.gateway.access.QuotaStoreUnavailableException;
+import com.liang.gateway.access.internal.application.AccessBadRequestException;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,10 @@ public class AccessExceptionHandler implements WebExceptionHandler {
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+        ModelForbiddenException forbidden = find(ex, ModelForbiddenException.class);
+        if (forbidden != null) {
+            return ErrorEnvelope.write(exchange, HttpStatus.FORBIDDEN, "forbidden", forbidden.getMessage());
+        }
         QuotaExceededException quotaExceeded = find(ex, QuotaExceededException.class);
         if (quotaExceeded != null) {
             return ErrorEnvelope.write(exchange, HttpStatus.TOO_MANY_REQUESTS, "quota_exceeded", quotaExceeded.getMessage());
@@ -23,6 +29,10 @@ public class AccessExceptionHandler implements WebExceptionHandler {
         if (unavailable != null) {
             return ErrorEnvelope.write(
                     exchange, HttpStatus.SERVICE_UNAVAILABLE, "service_unavailable", "Quota store unavailable");
+        }
+        AccessBadRequestException badRequest = find(ex, AccessBadRequestException.class);
+        if (badRequest != null) {
+            return ErrorEnvelope.write(exchange, HttpStatus.BAD_REQUEST, "request_error", badRequest.getMessage());
         }
         return Mono.error(ex);
     }

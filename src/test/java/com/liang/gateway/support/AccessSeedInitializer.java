@@ -1,6 +1,9 @@
 package com.liang.gateway.support;
 
+import com.liang.gateway.access.QuotaLayer;
 import com.liang.gateway.access.internal.application.QuotaWindowStore;
+import com.liang.gateway.access.internal.infrastructure.jpa.UsageLimitEntity;
+import com.liang.gateway.access.internal.infrastructure.jpa.UsageLimitRepository;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenEntity;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
 import com.liang.gateway.access.internal.infrastructure.jpa.UserEntity;
@@ -8,9 +11,9 @@ import com.liang.gateway.access.internal.infrastructure.jpa.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,17 +21,17 @@ public class AccessSeedInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final UserAccessTokenRepository tokenRepository;
-    private final JdbcTemplate jdbcTemplate;
+    private final UsageLimitRepository usageLimitRepository;
     private final QuotaWindowStore quotaWindowStore;
 
     public AccessSeedInitializer(
             UserRepository userRepository,
             UserAccessTokenRepository tokenRepository,
-            JdbcTemplate jdbcTemplate,
+            UsageLimitRepository usageLimitRepository,
             QuotaWindowStore quotaWindowStore) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
-        this.jdbcTemplate = jdbcTemplate;
+        this.usageLimitRepository = usageLimitRepository;
         this.quotaWindowStore = quotaWindowStore;
     }
 
@@ -38,34 +41,27 @@ public class AccessSeedInitializer implements ApplicationRunner {
         if (userRepository.findByCode(TestTokens.USER_CODE).isEmpty()) {
             userRepository.save(UserEntity.create(TestTokens.USER_CODE, "core-test", "DATA", true, now));
         }
-        Integer apikeyCount = jdbcTemplate.queryForObject(
-                "select count(*) from llm_apikey_config where code = ?", Integer.class, TestTokens.APIKEY_CODE);
-        if (apikeyCount == null || apikeyCount == 0) {
-            jdbcTemplate.update(
-                    """
-                    INSERT INTO llm_apikey_config
-                    (code, name, provider, base_url, secret, prefix, enabled, expire_time, create_time, update_time)
-                    VALUES (?, 'core-test', 'deepseek', 'http://127.0.0.1', 'sk-test-placeholder', 'sk-test', 1, NULL, ?, ?)
-                    """,
-                    TestTokens.APIKEY_CODE,
-                    now,
-                    now);
-        }
         if (tokenRepository.findByAccessToken(TestTokens.ACCESS_TOKEN).isEmpty()) {
             tokenRepository.save(UserAccessTokenEntity.create(
                     TestTokens.TOKEN_CODE,
                     TestTokens.USER_CODE,
                     TestTokens.ACCESS_TOKEN,
-                    TestTokens.APIKEY_CODE,
                     true,
                     null,
                     10_000,
-                    1_000_000L,
-                    1_000_000L,
                     now));
+            usageLimitRepository.save(UsageLimitEntity.create(
+                    TestTokens.USER_CODE, TestTokens.TOKEN_CODE, 1, 1_000_000L, 0L, now));
+            usageLimitRepository.save(UsageLimitEntity.create(
+                    TestTokens.USER_CODE, TestTokens.TOKEN_CODE, 2, 1_000_000L, 0L, now));
         }
         try {
-            quotaWindowStore.openWindows(TestTokens.TOKEN_CODE, Instant.now()).block(Duration.ofSeconds(3));
+            quotaWindowStore
+                    .openWindows(
+                            TestTokens.TOKEN_CODE,
+                            List.of(QuotaLayer.FIVE_HOUR, QuotaLayer.WEEK),
+                            Instant.now())
+                    .block(Duration.ofSeconds(3));
         } catch (RuntimeException ignored) {
             // Redis-down tests still need the database seed for authentication.
         }

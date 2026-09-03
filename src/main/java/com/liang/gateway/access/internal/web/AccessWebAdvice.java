@@ -1,5 +1,6 @@
 package com.liang.gateway.access.internal.web;
 
+import com.liang.gateway.access.ModelForbiddenException;
 import com.liang.gateway.access.internal.application.AccessBadRequestException;
 import com.liang.gateway.access.internal.application.AccessNotFoundException;
 import java.util.Map;
@@ -20,6 +21,11 @@ public class AccessWebAdvice {
     @ExceptionHandler(AccessBadRequestException.class)
     public ResponseEntity<Map<String, Object>> badRequest(AccessBadRequestException ex) {
         return envelope(HttpStatus.BAD_REQUEST, "request_error", ex.getMessage());
+    }
+
+    @ExceptionHandler(ModelForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> forbidden(ModelForbiddenException ex) {
+        return envelope(HttpStatus.FORBIDDEN, "forbidden", ex.getMessage());
     }
 
     private static ResponseEntity<Map<String, Object>> envelope(HttpStatus status, String type, String message) {

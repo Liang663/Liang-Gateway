@@ -6,9 +6,9 @@
 
 ```
 core     网关转发：过滤器链、单 URL 反代、Health
-access   调用方：鉴权之后的额度、Token 计数（Security 只解决进不进得来）
-ai       Chat 协议 + MCP 协议
-orchestration    编排：一次调用按序调上面三个，自己不写 Redis / 不写拷流 / 不写 JSON-RPC
+access   调用方：鉴权、金额窗口、模型授权、记账（Security 只解决进不进得来）
+ai       Chat 协议（组上游、usage、计价）；MCP 后置
+orchestration    编排：一次调用按序调上面三个，自己不写 Redis / 不写拷流 / 不写模型协议
 ```
 
 根包 `com.liang.gateway`。没有独立 `llm` / `mcp` / `metering` / `admin` / `infrastructure`。
@@ -54,15 +54,15 @@ orchestration    core, access, ai
 
 ## 3. 一次 Chat 怎么走（领域粒度）
 
-1. **access（Security）**：Key 无效则请求到不了后面。只解决进门，不算额度。
-2. **orchestration**：数据面入口，开始编排。
-3. **ai**：看 Chat 请求，给出「转到哪、是否流式、响应里怎么读 usage」。不管 Key 和 Redis。
-4. **access**：按已用量做额度检查，不够则 429；Redis 不可用则 503。orchestration 来调，不是 core 来调。
-5. **core**：按 ai 给出的上游做反代（可 SSE）。
-6. **ai**：从响应里读出实际用量（协议细节）。
-7. **access**：按实际 Token 计数。
+1. **access（Security）**：凭证无效则到不了后面。只解决进门。
+2. **orchestration**：数据面入口。读请求里的 `model` 与 body。
+3. **access**：该令牌是否授权此模型；金额窗口是否够。不够 429，未授权 403，Redis 挂 503。
+4. **ai**：按模型组出站 URL/头/body（透传），不管访问令牌。
+5. **core**：反代（可 SSE）。编排在发出时打点，第一帧算 TTFT。Chat 为拿到 usage，客户端断开后仍 drain 上游直到 usage 或结束（与通用反代「断开即取消」不同）。
+6. **ai**：读 usage，按目录官方单价算分。流式强制 `include_usage=true`。编排把本笔成败与耗时交给 ai 写入出站日志。
+7. **access**：按真实 usage 记 Token 与金额（一次加上本笔分，并把 Redis 新已用回写限额行）。
 
-MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JSON-RPC / Tool HTTP → 必要时再调 core 转发或由 ai 自己出站（Tool 不是「一个固定 LLM 上游」）。没有 `usage` 则不记 Token。orchestration 仍然不写映射和 session。
+MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JSON-RPC / Tool HTTP → 必要时再调 core 转发或由 ai 自己出站。MCP 无模型 usage 则不走 Chat 记账。orchestration 仍然不写映射和 session。
 
 **管理接口不是数据面：** 用户与令牌管理在 access，`/admin` 下 MCP 配置仍在 ai。Health 在 core。
 
@@ -78,19 +78,18 @@ MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JS
 
 ### access
 
-`user` / `user_access_token` / `usage_record`、限额配置、Redis 当前段计数、**额度检查 / 计数 / 用量查询 API**、Security、用户与令牌管理 HTTP。  
-Security ≠ 额度。额度必须提供给 orchestration 调用。  
-不拥有：反代、模型协议、大模型 Key 主数据。
+`user` / `user_access_token` / `user_access_token_model` / `usage_limit` / `usage_record`、金额窗口 Redis、模型名授权、记账 API、Security。  
+不拥有：单价、出站 Key、出站日志、反代、模型协议。
 
 ### ai
 
-Chat 如何理解、上游是谁、TTFT/usage 如何从协议里读；MCP 的表、session、tools、OpenAPI 导入、Tool 出站语义。  
-不拥有：验 Key、Redis 计数、通用拷流循环。  
+模型目录与官方单价、出站 Key、组上游、读 usage 并计价、出站调用日志。MCP 后置。  
+不拥有：验访问令牌、金额窗口、通用拷流、TTFT 计时（只收编排算好的毫秒）。  
 内部可分子包 `chat` / `mcp`，暂不拆 Modulith 模块。
 
 ### orchestration
 
-数据面 Controller 与应用服务：**只排序调用**。把 ai 的「去哪」转成 core 的 `Upstream`，把 ai 读出的用量交给 access。  
+数据面 Controller 与应用服务：**只排序调用**。把 ai 的「去哪」转成 core 的 `Upstream`，打 TTFT，把出站结果交给 ai 记日志，把 ai 读出的用量交给 access。  
 不拥有：表、Redis、WebClient 拷流实现、JSON-RPC 状态机。
 
 ---
@@ -99,12 +98,12 @@ Chat 如何理解、上游是谁、TTFT/usage 如何从协议里读；MCP 的表
 
 | 存储 | 所有者 |
 |---|---|
-| `user`、`user_access_token`、`usage_record`、限额 Redis | access |
-| `llm_apikey_config` | ai |
+| `user`、`user_access_token`、`user_access_token_model`、`usage_limit`、`usage_record`、限额 Redis | access |
+| `llm_apikey_config`、`llm_model`、`llm_call_log` | ai |
 | `gw_mcp_*` | ai |
 | 无 | orchestration、core（core 可有代理超时 yml） |
 
-表结构真相源：`docs/sql-gateway-user.md`。关系：`user` 1:N `user_access_token` N:1 `llm_apikey_config`；`usage_record` 归属令牌。对外凭证是 `access_token`，不是 `code`。
+表结构真相源：`docs/sql-gateway-user.md`。令牌授权模型名，不对 `llm_model` 建外键。出站 Key 挂在模型上。对外凭证是 `access_token`。
 
 ---
 

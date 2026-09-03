@@ -6,6 +6,7 @@ import com.liang.gateway.access.internal.application.QuotaWindowStore;
 import com.liang.gateway.access.internal.infrastructure.QuotaProperties;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.springframework.core.io.ClassPathResource;
@@ -13,6 +14,7 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Component
@@ -35,12 +37,35 @@ public class RedisQuotaWindowStore implements QuotaWindowStore {
     }
 
     @Override
-    public Mono<Void> openWindows(String tokenCode, Instant now) {
+    public Mono<Void> openWindows(String tokenCode, Collection<QuotaLayer> layers, Instant now) {
+        if (layers == null || layers.isEmpty()) {
+            return Mono.empty();
+        }
         String start = String.valueOf(now.getEpochSecond());
         Map<String, String> fields = Map.of("start", start, "used", "0");
-        return Mono.zip(
-                        redis.opsForHash().putAll(keys.window(tokenCode, QuotaLayer.FIVE_HOUR), fields),
-                        redis.opsForHash().putAll(keys.window(tokenCode, QuotaLayer.WEEK), fields))
+        return Flux.fromIterable(List.copyOf(layers))
+                .flatMap(layer -> redis.opsForHash().putAll(keys.window(tokenCode, layer), fields))
+                .then()
+                .onErrorMap(this::unavailable);
+    }
+
+    @Override
+    public Mono<Void> ensureWindows(String tokenCode, Collection<QuotaLayer> layers, Instant now) {
+        if (layers == null || layers.isEmpty()) {
+            return Mono.empty();
+        }
+        String start = String.valueOf(now.getEpochSecond());
+        Map<String, String> fields = Map.of("start", start, "used", "0");
+        return Flux.fromIterable(List.copyOf(layers))
+                .concatMap(layer -> {
+                    String key = keys.window(tokenCode, layer);
+                    return redis.hasKey(key).flatMap(exists -> {
+                        if (Boolean.TRUE.equals(exists)) {
+                            return Mono.empty();
+                        }
+                        return redis.opsForHash().putAll(key, fields).then();
+                    });
+                })
                 .then()
                 .onErrorMap(this::unavailable);
     }
@@ -55,13 +80,13 @@ public class RedisQuotaWindowStore implements QuotaWindowStore {
     }
 
     @Override
-    public Mono<WindowSnapshot> refreshAndIncrement(String tokenCode, QuotaLayer layer, long tokens, Instant now) {
+    public Mono<WindowSnapshot> refreshAndIncrement(String tokenCode, QuotaLayer layer, long amountFen, Instant now) {
         return executeList(
                 incrScript,
                 keys.window(tokenCode, layer),
                 String.valueOf(now.getEpochSecond()),
                 String.valueOf(layer.durationSeconds()),
-                String.valueOf(tokens));
+                String.valueOf(amountFen));
     }
 
     @Override

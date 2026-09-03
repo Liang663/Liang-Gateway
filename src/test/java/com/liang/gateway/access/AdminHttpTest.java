@@ -2,8 +2,8 @@ package com.liang.gateway.access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.liang.gateway.access.support.PlaceholderApiKeys;
 import com.liang.gateway.support.TestTokens;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -21,15 +20,9 @@ class AdminHttpTest {
     @Autowired
     private WebTestClient webTestClient;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
     @Test
-    @DisplayName("管理面可以维护用户和令牌，并重置额度")
+    @DisplayName("管理面可以维护用户、令牌、授权模型与限额行，并重置额度")
     void adminCrudAndReset() {
-        String apikeyCode = "apk_admin_" + System.nanoTime();
-        PlaceholderApiKeys.insert(jdbcTemplate, apikeyCode);
-
         byte[] userBody = webTestClient
                 .post()
                 .uri("/admin/users")
@@ -65,11 +58,14 @@ class AdminHttpTest {
                 .header("X-Admin-Token", TestTokens.ADMIN_TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(Map.of(
-                        "apikeyCode", apikeyCode,
-                        "qpmLimit", 30,
-                        "hourlyTokenLimit", 100,
-                        "weeklyTokenLimit", 1000,
-                        "enabled", true))
+                        "qpmLimit",
+                        30,
+                        "models",
+                        List.of("deepseek-chat"),
+                        "limits",
+                        List.of(Map.of("limitType", 1, "usage", 100), Map.of("limitType", 2, "usage", 1000)),
+                        "enabled",
+                        true))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -77,7 +73,19 @@ class AdminHttpTest {
                 .jsonPath("$.accessToken")
                 .exists()
                 .jsonPath("$.apikeyCode")
-                .isEqualTo(apikeyCode)
+                .doesNotExist()
+                .jsonPath("$.models[0]")
+                .isEqualTo("deepseek-chat")
+                .jsonPath("$.limits[0].limitType")
+                .isEqualTo(1)
+                .jsonPath("$.limits[0].usage")
+                .isEqualTo(100)
+                .jsonPath("$.limits[0].used")
+                .isEqualTo(0)
+                .jsonPath("$.limits[1].limitType")
+                .isEqualTo(2)
+                .jsonPath("$.limits[1].usage")
+                .isEqualTo(1000)
                 .returnResult()
                 .getResponseBody();
         String tokenJson = new String(tokenBody);
@@ -112,11 +120,8 @@ class AdminHttpTest {
     }
 
     @Test
-    @DisplayName("PUT 省略 enabled 和 expireTime 时保持原值")
+    @DisplayName("PUT 省略 enabled、expireTime、models、limits 时保持原值")
     void putOmitsEnabledAndExpireTimeKeepsOriginals() {
-        String apikeyCode = "apk_put_" + System.nanoTime();
-        PlaceholderApiKeys.insert(jdbcTemplate, apikeyCode);
-
         byte[] userBody = webTestClient
                 .post()
                 .uri("/admin/users")
@@ -165,14 +170,12 @@ class AdminHttpTest {
                 .header("X-Admin-Token", TestTokens.ADMIN_TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(Map.of(
-                        "apikeyCode",
-                        apikeyCode,
                         "qpmLimit",
                         10,
-                        "hourlyTokenLimit",
-                        100,
-                        "weeklyTokenLimit",
-                        1000,
+                        "models",
+                        List.of("deepseek-chat"),
+                        "limits",
+                        List.of(Map.of("limitType", 1, "usage", 100), Map.of("limitType", 2, "usage", 1000)),
                         "enabled",
                         true,
                         "expireTime",
@@ -190,8 +193,7 @@ class AdminHttpTest {
                 .uri("/admin/users/" + userCode + "/tokens/" + tokenCode)
                 .header("X-Admin-Token", TestTokens.ADMIN_TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "qpmLimit", 10, "hourlyTokenLimit", 100, "weeklyTokenLimit", 1000, "enabled", false))
+                .bodyValue(Map.of("qpmLimit", 10, "enabled", false))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -199,28 +201,68 @@ class AdminHttpTest {
                 .jsonPath("$.enabled")
                 .isEqualTo(false)
                 .jsonPath("$.expireTime")
-                .isEqualTo("2026-12-01T00:00:00");
+                .isEqualTo("2026-12-01T00:00:00")
+                .jsonPath("$.models[0]")
+                .isEqualTo("deepseek-chat")
+                .jsonPath("$.limits[0].usage")
+                .isEqualTo(100);
 
         webTestClient
                 .put()
                 .uri("/admin/users/" + userCode + "/tokens/" + tokenCode)
                 .header("X-Admin-Token", TestTokens.ADMIN_TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("qpmLimit", 20, "hourlyTokenLimit", 200, "weeklyTokenLimit", 2000))
+                .bodyValue(Map.of(
+                        "qpmLimit",
+                        20,
+                        "models",
+                        List.of("deepseek-chat", "deepseek-reasoner"),
+                        "limits",
+                        List.of(Map.of("limitType", 1, "usage", 200), Map.of("limitType", 2, "usage", 2000))))
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
                 .jsonPath("$.qpmLimit")
                 .isEqualTo(20)
-                .jsonPath("$.hourlyTokenLimit")
+                .jsonPath("$.limits[0].usage")
                 .isEqualTo(200)
-                .jsonPath("$.weeklyTokenLimit")
+                .jsonPath("$.limits[1].usage")
                 .isEqualTo(2000)
+                .jsonPath("$.models[1]")
+                .isEqualTo("deepseek-reasoner")
                 .jsonPath("$.enabled")
                 .isEqualTo(false)
                 .jsonPath("$.expireTime")
                 .isEqualTo("2026-12-01T00:00:00");
+    }
+
+    @Test
+    @DisplayName("创建令牌限额缺 usage 是 400 而不是 500")
+    void createTokenMissingLimitUsageIs400() {
+        byte[] userBody = webTestClient
+                .post()
+                .uri("/admin/users")
+                .header("X-Admin-Token", TestTokens.ADMIN_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("name", "limit-user", "authority", "DATA", "enabled", true))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .returnResult()
+                .getResponseBody();
+        String userCode = extract(userBody, "\"code\":\"", "\"");
+
+        webTestClient
+                .post()
+                .uri("/admin/users/" + userCode + "/tokens")
+                .header("X-Admin-Token", TestTokens.ADMIN_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("qpmLimit", 10, "limits", List.of(Map.of("limitType", 1))))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test

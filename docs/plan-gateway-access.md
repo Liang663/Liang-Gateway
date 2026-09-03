@@ -24,7 +24,7 @@
 - 不做：Chat、MCP、orchestration 编排、core Filter 挂额度、Caffeine、字符粗估、`llm_apikey_config` 管理面、预付费钱包 SET 剩余。
 - 待澄清：无。
 
-已采纳：QPM 保留；`hourly_token_limit` 表示五小时；`weekly_token_limit` 表示七天；Redis 挂了 503；到期刷新 `start += n * 时长`；只有手动重置 `start=now`；查询额度前都刷新。
+已采纳（第一版）：QPM 保留；当时限额列在令牌上（Token 计数）。金额拆到 `usage_limit`、单位改分，见后续 `docs/plan-gateway-access-billing.md`。Redis 挂了 503；到期刷新 `start += n * 时长`；只有手动重置 `start=now`；查询额度前都刷新。
 
 ## 3. 背景
 
@@ -62,7 +62,7 @@ core 的 `GatewayExceptionHandler` 会把 429 写成 `request_error`。access �
 | 七天 | `{prefix}:{tokenCode}:week` | 同上；时长 604800 |
 | QPM | `{prefix}:{tokenCode}:qpm:{yyyyMMddHHmm}` | STRING INCR |
 
-限额读表：`hourly_token_limit` / `weekly_token_limit` / `qpm_limit`。
+限额读表（第一版）：`hourly_token_limit` / `weekly_token_limit` / `qpm_limit`。后续金额限额改 `usage_limit`，见 `docs/plan-gateway-access-billing.md`。
 
 **刷新 Lua（检查、记账、getQuota 都走）：**
 
@@ -173,12 +173,8 @@ com.liang.gateway.access
 
 ## 14. 当前状态
 
-- 状态：已完成（待本地 git 提交）
-- 当前阶段：任务 7
-- 已完成：任务 1–7；门禁 A / B 测试通过；`mvn test` 全绿；`ApplicationModules.verify()` 通过
-- 阻塞项：无
-- 下一步：本地 git 提交（不要提交 `config/application-local.yml`）。不要开始 ai
-- 回流：公开类型名与本 Plan 建议一致，Spec 公开能力无需改类名；表以 SQL 为准未改字段名
+- 状态：已完成（master `3a15481`）
+- 金额限额与模型授权：见 `docs/plan-gateway-access-billing.md`
 
 ## 15. 执行要求
 

@@ -34,7 +34,10 @@ public class UsageRecordEntity {
     @Column(name = "total_tokens", nullable = false)
     private long totalTokens;
 
-    @Column(name = "model", length = 64)
+    @Column(name = "amount_fen", nullable = false)
+    private long amountFen;
+
+    @Column(name = "model", nullable = false, length = 64)
     private String model;
 
     @Column(name = "request_id", length = 64)
@@ -51,6 +54,7 @@ public class UsageRecordEntity {
             String userCode,
             long promptTokens,
             long completionTokens,
+            long amountFen,
             String model,
             String requestId,
             LocalDateTime createTime) {
@@ -61,6 +65,7 @@ public class UsageRecordEntity {
         entity.promptTokens = promptTokens;
         entity.completionTokens = completionTokens;
         entity.totalTokens = promptTokens + completionTokens;
+        entity.amountFen = amountFen;
         entity.model = model;
         entity.requestId = requestId;
         entity.createTime = createTime;
@@ -93,6 +98,10 @@ public class UsageRecordEntity {
 
     public long getTotalTokens() {
         return totalTokens;
+    }
+
+    public long getAmountFen() {
+        return amountFen;
     }
 
     public String getModel() {

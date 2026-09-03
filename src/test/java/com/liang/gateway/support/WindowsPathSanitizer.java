@@ -33,7 +33,7 @@ final class WindowsPathSanitizer {
             Field m = unmodifiableMap.getClass().getDeclaredField("m");
             m.setAccessible(true);
             ((Map<String, String>) m.get(unmodifiableMap)).put(key, value);
-        } catch (ReflectiveOperationException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
             // Fall through to the case-insensitive map used on Windows.
         }
         try {
@@ -42,7 +42,7 @@ final class WindowsPathSanitizer {
             caseInsensitive.setAccessible(true);
             ((Map<String, String>) caseInsensitive.get(null)).put(key, value);
             return true;
-        } catch (ReflectiveOperationException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
             return false;
         }
     }

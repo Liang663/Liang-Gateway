@@ -32,18 +32,33 @@ public class UsageQueryService {
         String normalized = range == null ? "" : range.toLowerCase(Locale.ROOT);
         LocalDateTime to = accessClock.nowShanghai();
         return jpaExecutor.call(() -> {
-            UsageTotals totals =
-                    switch (normalized) {
-                        case "hour", "day", "week", "month" -> usageRecordRepository.sumBetween(
-                                tokenCode, rangeStart(normalized), to);
-                        case "total" -> usageRecordRepository.sumAll(tokenCode);
-                        default -> throw new AccessBadRequestException("Unsupported range");
-                    };
+            UsageTotals totals;
+            List<ModelUsageTotals> byModel;
+            switch (normalized) {
+                case "hour", "day", "week", "month" -> {
+                    LocalDateTime from = rangeStart(normalized);
+                    totals = usageRecordRepository.sumBetween(tokenCode, from, to);
+                    byModel = usageRecordRepository.sumByModelBetween(tokenCode, from, to);
+                }
+                case "total" -> {
+                    totals = usageRecordRepository.sumAll(tokenCode);
+                    byModel = usageRecordRepository.sumByModelAll(tokenCode);
+                }
+                default -> throw new AccessBadRequestException("Unsupported range");
+            }
             if (totals == null) {
                 totals = UsageTotals.zero();
             }
+            if (byModel == null) {
+                byModel = List.of();
+            }
             return new UsageStatsSnapshot(
-                    normalized, totals.promptTokens(), totals.completionTokens(), totals.totalTokens());
+                    normalized,
+                    totals.promptTokens(),
+                    totals.completionTokens(),
+                    totals.totalTokens(),
+                    totals.amountFen(),
+                    byModel);
         });
     }
 
@@ -57,6 +72,7 @@ public class UsageQueryService {
                         entity.getPromptTokens(),
                         entity.getCompletionTokens(),
                         entity.getTotalTokens(),
+                        entity.getAmountFen(),
                         entity.getModel(),
                         entity.getRequestId(),
                         entity.getCreateTime()))

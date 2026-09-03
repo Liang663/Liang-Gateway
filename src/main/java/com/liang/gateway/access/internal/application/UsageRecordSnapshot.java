@@ -7,6 +7,7 @@ public record UsageRecordSnapshot(
         long promptTokens,
         long completionTokens,
         long totalTokens,
+        long amountFen,
         String model,
         String requestId,
         LocalDateTime createTime) {}

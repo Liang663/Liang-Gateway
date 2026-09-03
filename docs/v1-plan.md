@@ -13,12 +13,14 @@
 | [v1-plan.md](v1-plan.md) | 目标、非目标、技术栈、简历、实现顺序 | 现行 |
 | [references/domains.md](references/domains.md) | `core` / `access` / `ai` + 编排入口 `orchestration` | 现行 |
 | [spec-gateway-core.md](spec-gateway-core.md) | core 长期 Spec | 生效 |
-| [plan-gateway-core.md](plan-gateway-core.md) | core 第一版编码计划 | 已实现，待本地 git 提交 |
+| [plan-gateway-core.md](plan-gateway-core.md) | core 第一版编码计划 | 已实现 |
 | [spec-gateway-access.md](spec-gateway-access.md) | access 长期 Spec | 生效 |
-| [plan-gateway-access.md](plan-gateway-access.md) | access 第一版编码计划 | 已实现，待本地 git 提交 |
-| [sql-gateway-user.md](sql-gateway-user.md) | user / user_access_token / llm_apikey_config / usage_record | 生效 |
+| [plan-gateway-access.md](plan-gateway-access.md) | access 第一版编码计划 | 已实现 |
+| [plan-gateway-access-billing.md](plan-gateway-access-billing.md) | 金额限额与模型授权 | 已实现 |
+| [sql-gateway-user.md](sql-gateway-user.md) | 用户、令牌、限额、模型、用量、出站日志 | 生效 |
+| [spec-gateway-ai.md](spec-gateway-ai.md) | ai Chat Spec | 生效 |
+| [plan-gateway-ai.md](plan-gateway-ai.md) | ai Chat 编码计划 | 已实现 |
 | [research-higress-token-limit.md](research-higress-token-limit.md) | Higress Token 限制调研（已吸收） | 参考 |
-| references/ai.md | Chat + MCP | 未写 |
 
 已取消：独立 `llm` / `mcp` / `metering` / `admin` 模块文档。MCP 与 Chat 同属 `ai`。
 
@@ -34,8 +36,8 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 
 **要验收的**
 
-1. `POST /v1/chat/completions` 非流式与 SSE 真流式打到 DeepSeek，chunk 随到随转。
-2. 流式记录 TTFT 与总耗时；结束后按上游 `usage` 记实际 Token。
+1. `POST /v1/chat/completions`：调用方带 `model` 与拼好的 `messages`（及其余字段原样转发），非流式与 SSE 真流式打到所配供应商（第一版 DeepSeek），chunk 随到随转。
+2. 流式记录 TTFT（发出上游请求到第一帧）与总耗时，写入出站日志；结束后按 `usage` 记 Token 与金额（分），按模型名分组。
 3. 无合法 API Key → 401；超额 → 429；额度 Redis 不可用 → 503。
 4. HTTP API 可配成 MCP Tool；`initialize` / `tools/list` / `tools/call`；SSE 与 Streamable HTTP。
 5. 热路径不在 Netty 事件循环上跑 JPA / 同步 JDBC。
@@ -46,7 +48,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 |---|---|
 | RAG / 语义缓存 / 意图 / 网关侧历史会话 | 推迟 |
 | 内容安全、黄赌毒政、脱敏 | 下放到业务 |
-| 多模型、多厂商、模型名映射 | 上游写死 DeepSeek |
+| 多厂商适配实现 | 第一版只实现 DeepSeek，目录与接口不写死 |
 | 网关内 Agent | 网关不循环调工具 |
 | 远程 MCP 反代、市场工具、stdio、WebSocket | 只做 HTTP→MCP |
 | 谎称 resources/prompts | initialize 只声明 tools |
@@ -85,8 +87,8 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 
 ```
 core     {}                         网关转发：链、单 URL 反代、Health
-access   {}                         调用方：Security（进门）+ 额度 API + 计数
-ai       {}                         Chat + MCP 协议
+access   {}                         调用方：Security + 金额窗口 + 模型授权 + 记账
+ai       {}                         Chat 协议（MCP 后置）
 orchestration    core, access, ai           编排：数据面入口，只排序调用
 ```
 
@@ -98,11 +100,11 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 **core：** 过滤器链、Health、通用 WebClient 反代（单 URL，无注册中心/LB）。第一版路由就是 Controller 映射。详见 [spec-gateway-core.md](spec-gateway-core.md)、[plan-gateway-core.md](plan-gateway-core.md)。
 
-**access：** Security 只验进门。另提供额度检查 / Token 计数 API。令牌绑定 Key 后打开当前五小时与七天窗口（Redis 只存这一扇的起点和已用）；到期自动刷新，管理可手动重置。MySQL 存用户、令牌、用量明细。可展示当前用量/限额，以及时/日/周/月/总量与明细。
+**access：** Security 只验进门。金额限额在 `usage_limit`（分；可不限额或五小时/七天窗）、QPM、令牌授权模型名。判超限读 Redis，写时回写已用。明细记 Token 与金额，按模型名分组。不读单价、不做出站。
 
-**ai：** 协议 API（Chat 如何理解、上游是谁、usage 怎么从响应读；MCP JSON-RPC / Tool）。**没有数据面 HTTP 入口。**
+**ai：** 模型目录与官方单价、出站 Key、组上游（body 透传）、读 usage 并算分、出站调用日志（TTFT/故障率按 Key 扫日志）。**没有数据面 HTTP。** MCP 另开 Plan。
 
-**orchestration：** `POST /v1/chat/completions` 与 MCP 数据面入口；按序调 access → ai → core → access。不写业务算法。
+**orchestration：** `POST /v1/chat/completions` 与 MCP 数据面入口；按序调 access → ai → core → ai 记出站日志 → access 记账。不写业务算法。
 
 **表：** 见 [sql-gateway-user.md](sql-gateway-user.md)。`gw_mcp_*` 仍待定，归 ai。
 
@@ -116,9 +118,10 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 2. 四个 `package-info` + `ApplicationModules.verify()`
 3. **core**（应用能起、链、反代）见 [plan-gateway-core.md](plan-gateway-core.md)
 4. **access**（进门 + 额度 API）
-5. **ai**（先 Chat 协议，再 MCP；无数据面 HTTP）
-6. **orchestration**（接 HTTP，先串 Chat 再 MCP）
-7. 种子、README、补测试
+5. **access 金额/授权**（`plan-gateway-access-billing.md`）与 **ai Chat**（`plan-gateway-ai.md`）
+6. **orchestration**（接 HTTP，先串 Chat）
+7. MCP（ai + orchestration）
+8. 种子、README、补测试
 
 ---
 
@@ -131,8 +134,8 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 项目描述：自研 AI 网关，作为大模型调用与 Agent 工具调用的统一接入层，用于管理和控制大模型调用请求。基于 Spring WebFlux 搭建网关核心，使用 WebClient 实现全异步流式全链路处理。实现模型转发、MCP 协议转换、流量控制等多种能力，保证 SSE 长连接场景下可计量、可转发。
 
 - 针对模型调用构建 OpenAI 兼容接入，支持非流式响应与 SSE 流式透传，记录 TTFT 与端到端耗时。
-- 针对请求构建响应式过滤器链，实现鉴权、Token 限流与上游转发。
-- 实现调用方套餐额度：令牌绑定上游 Key 后打开当前五小时与七天窗口；到期自动刷新、支持手动重置；请求前按已用额度拦截，请求后按上游实际 Token 记账；支持 QPM 防刷、当前用量展示、按时日周月总量统计与用量明细；Redis 不可用则拒绝服务。
+- 针对请求构建响应式过滤器链，实现鉴权、额度控制与上游转发。
+- 实现调用方套餐额度：五小时与七天按金额（分）限额；请求前检查授权模型与已用金额，请求后按实际上游 Token 与金额记账，并按模型名分组统计；支持 QPM 防刷与用量明细；Redis 不可用则拒绝服务。
 - 实现 HTTP 到 MCP 的协议转换，支持 initialize、tools/list、tools/call，提供 SSE 与 Streamable HTTP 双传输，支持 path/query/body 字段映射，以及 OpenAPI 导入生成 Tool 与 schema。
 - 使用 Spring Modulith 治理项目代码，按模块化单体划分领域并约束模块依赖，便于后续重构与按能力拆分为微服务。
 

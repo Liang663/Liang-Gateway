@@ -1,13 +1,15 @@
 package com.liang.gateway.access.internal.web;
 
 import com.liang.gateway.access.QuotaLayer;
+import com.liang.gateway.access.internal.application.AccessBadRequestException;
 import com.liang.gateway.access.internal.application.TokenAdminService;
 import com.liang.gateway.access.internal.application.TokenSnapshot;
+import com.liang.gateway.access.internal.application.UsageLimitInput;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,12 +34,11 @@ public class AdminTokenController {
     public Mono<TokenSnapshot> create(@PathVariable String userCode, @Valid @RequestBody CreateTokenRequest request) {
         return tokenAdminService.create(
                 userCode,
-                request.apikeyCode(),
                 request.qpmLimit(),
-                request.hourlyTokenLimit(),
-                request.weeklyTokenLimit(),
                 request.enabledOrDefault(),
-                request.expireTime());
+                request.expireTime(),
+                request.models() == null ? List.of() : request.models(),
+                toInputs(request.limits()));
     }
 
     @GetMapping
@@ -62,8 +63,8 @@ public class AdminTokenController {
                 request.getExpireTime(),
                 request.expireTimePresent(),
                 request.getQpmLimit(),
-                request.getHourlyTokenLimit(),
-                request.getWeeklyTokenLimit());
+                request.modelsPresent() ? request.getModels() : null,
+                request.limitsPresent() ? toInputs(request.getLimits()) : null);
     }
 
     @PostMapping("/{tokenCode}/quota/reset")
@@ -74,11 +75,24 @@ public class AdminTokenController {
         return tokenAdminService.resetQuota(userCode, tokenCode, request.layer());
     }
 
+    private static List<UsageLimitInput> toInputs(List<LimitBody> limits) {
+        if (limits == null || limits.isEmpty()) {
+            return List.of();
+        }
+        List<UsageLimitInput> inputs = new ArrayList<>();
+        for (LimitBody body : limits) {
+            if (body == null || body.limitType() == null || body.usage() == null) {
+                throw new AccessBadRequestException("limits require limitType and usage");
+            }
+            inputs.add(new UsageLimitInput(body.limitType(), body.usage()));
+        }
+        return inputs;
+    }
+
     public record CreateTokenRequest(
-            @NotBlank String apikeyCode,
             @NotNull Integer qpmLimit,
-            @NotNull Long hourlyTokenLimit,
-            @NotNull Long weeklyTokenLimit,
+            List<String> models,
+            @Valid List<@Valid LimitBody> limits,
             Boolean enabled,
             LocalDateTime expireTime) {
         boolean enabledOrDefault() {
@@ -86,20 +100,21 @@ public class AdminTokenController {
         }
     }
 
+    public record LimitBody(@NotNull Integer limitType, @NotNull Long usage) {}
+
     public static final class UpdateTokenRequest {
 
         @NotNull
         private Integer qpmLimit;
 
-        @NotNull
-        private Long hourlyTokenLimit;
-
-        @NotNull
-        private Long weeklyTokenLimit;
-
         private Boolean enabled;
         private LocalDateTime expireTime;
         private boolean expireTimePresent;
+        private List<String> models;
+        private boolean modelsPresent;
+        @Valid
+        private List<LimitBody> limits;
+        private boolean limitsPresent;
 
         public Integer getQpmLimit() {
             return qpmLimit;
@@ -107,22 +122,6 @@ public class AdminTokenController {
 
         public void setQpmLimit(Integer qpmLimit) {
             this.qpmLimit = qpmLimit;
-        }
-
-        public Long getHourlyTokenLimit() {
-            return hourlyTokenLimit;
-        }
-
-        public void setHourlyTokenLimit(Long hourlyTokenLimit) {
-            this.hourlyTokenLimit = hourlyTokenLimit;
-        }
-
-        public Long getWeeklyTokenLimit() {
-            return weeklyTokenLimit;
-        }
-
-        public void setWeeklyTokenLimit(Long weeklyTokenLimit) {
-            this.weeklyTokenLimit = weeklyTokenLimit;
         }
 
         public Boolean getEnabled() {
@@ -145,6 +144,34 @@ public class AdminTokenController {
 
         boolean expireTimePresent() {
             return expireTimePresent;
+        }
+
+        public List<String> getModels() {
+            return models;
+        }
+
+        @JsonSetter("models")
+        public void setModels(List<String> models) {
+            this.models = models;
+            this.modelsPresent = true;
+        }
+
+        boolean modelsPresent() {
+            return modelsPresent;
+        }
+
+        public List<LimitBody> getLimits() {
+            return limits;
+        }
+
+        @JsonSetter("limits")
+        public void setLimits(List<LimitBody> limits) {
+            this.limits = limits;
+            this.limitsPresent = true;
+        }
+
+        boolean limitsPresent() {
+            return limitsPresent;
         }
     }
 
