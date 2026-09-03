@@ -1,8 +1,10 @@
 package com.liang.gateway.core;
 
 import com.liang.gateway.core.support.TestPipelineConfiguration;
+import com.liang.gateway.support.TestTokens;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -29,6 +32,13 @@ class StreamingContractTest {
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @BeforeEach
+    void authorize() {
+        webTestClient = webTestClient.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.BEARER)
+                .build();
+    }
 
     @Test
     @DisplayName("测试 Filter 发出的三帧 SSE 按帧到达")

@@ -1,6 +1,7 @@
 package com.liang.gateway.core;
 
 import com.liang.gateway.core.support.TestPipelineConfiguration;
+import com.liang.gateway.support.TestTokens;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(
@@ -29,6 +31,13 @@ class WebClientProxyTimeoutTest {
     private WebTestClient webTestClient;
 
     private MockWebServer mockWebServer;
+
+    @BeforeEach
+    void authorize() {
+        webTestClient = webTestClient.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.BEARER)
+                .build();
+    }
 
     @BeforeEach
     void setUp() throws IOException {

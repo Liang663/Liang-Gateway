@@ -1,0 +1,3 @@
+org.springframework.boot.env.EnvironmentPostProcessor=com.liang.gateway.support.TestcontainersEnvironmentPostProcessor
+org.springframework.test.context.TestExecutionListener=com.liang.gateway.support.MutableClockResetTestExecutionListener
+

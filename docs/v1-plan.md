@@ -13,8 +13,11 @@
 | [v1-plan.md](v1-plan.md) | 目标、非目标、技术栈、简历、实现顺序 | 现行 |
 | [references/domains.md](references/domains.md) | `core` / `access` / `ai` + 编排入口 `orchestration` | 现行 |
 | [spec-gateway-core.md](spec-gateway-core.md) | core 长期 Spec | 生效 |
-| [plan-gateway-core.md](plan-gateway-core.md) | core 第一版编码计划 | 执行中，交给编码会话 |
-| references/access.md | Security、consumer、限流 | 未写 |
+| [plan-gateway-core.md](plan-gateway-core.md) | core 第一版编码计划 | 已实现，待本地 git 提交 |
+| [spec-gateway-access.md](spec-gateway-access.md) | access 长期 Spec | 生效 |
+| [plan-gateway-access.md](plan-gateway-access.md) | access 第一版编码计划 | 已实现，待本地 git 提交 |
+| [sql-gateway-user.md](sql-gateway-user.md) | user / user_access_token / llm_apikey_config / usage_record | 生效 |
+| [research-higress-token-limit.md](research-higress-token-limit.md) | Higress Token 限制调研（已吸收） | 参考 |
 | references/ai.md | Chat + MCP | 未写 |
 
 已取消：独立 `llm` / `mcp` / `metering` / `admin` 模块文档。MCP 与 Chat 同属 `ai`。
@@ -33,7 +36,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 
 1. `POST /v1/chat/completions` 非流式与 SSE 真流式打到 DeepSeek，chunk 随到随转。
 2. 流式记录 TTFT 与总耗时；结束后按上游 `usage` 记实际 Token。
-3. 无合法 API Key → 401；超额 → 429。
+3. 无合法 API Key → 401；超额 → 429；额度 Redis 不可用 → 503。
 4. HTTP API 可配成 MCP Tool；`initialize` / `tools/list` / `tools/call`；SSE 与 Streamable HTTP。
 5. 热路径不在 Netty 事件循环上跑 JPA / 同步 JDBC。
 
@@ -95,13 +98,13 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 **core：** 过滤器链、Health、通用 WebClient 反代（单 URL，无注册中心/LB）。第一版路由就是 Controller 映射。详见 [spec-gateway-core.md](spec-gateway-core.md)、[plan-gateway-core.md](plan-gateway-core.md)。
 
-**access：** Security 只验进门。另提供额度检查 / Token 计数 API 给 orchestration 调。Consumer 在 MySQL；Redis 固定窗口。`/admin/consumers`。
+**access：** Security 只验进门。另提供额度检查 / Token 计数 API。令牌绑定 Key 后打开当前五小时与七天窗口（Redis 只存这一扇的起点和已用）；到期自动刷新，管理可手动重置。MySQL 存用户、令牌、用量明细。可展示当前用量/限额，以及时/日/周/月/总量与明细。
 
 **ai：** 协议 API（Chat 如何理解、上游是谁、usage 怎么从响应读；MCP JSON-RPC / Tool）。**没有数据面 HTTP 入口。**
 
 **orchestration：** `POST /v1/chat/completions` 与 MCP 数据面入口；按序调 access → ai → core → access。不写业务算法。
 
-**表：** `gw_consumer`（access）；`gw_mcp_*` 四张（ai）。
+**表：** 见 [sql-gateway-user.md](sql-gateway-user.md)。`gw_mcp_*` 仍待定，归 ai。
 
 **线程：** 事件循环只做非阻塞。JPA 必须 `boundedElastic`。
 
@@ -129,7 +132,7 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 - 针对模型调用构建 OpenAI 兼容接入，支持非流式响应与 SSE 流式透传，记录 TTFT 与端到端耗时。
 - 针对请求构建响应式过滤器链，实现鉴权、Token 限流与上游转发。
-- 实现多维流量控制，支持请求前按字符粗估拦截、请求后按实际 Token 用量统计，支持 QPM、小时配额与日配额，基于 Redis 固定窗口跨实例计数，并可通过管理接口调整配额。
+- 实现调用方套餐额度：令牌绑定上游 Key 后打开当前五小时与七天窗口；到期自动刷新、支持手动重置；请求前按已用额度拦截，请求后按上游实际 Token 记账；支持 QPM 防刷、当前用量展示、按时日周月总量统计与用量明细；Redis 不可用则拒绝服务。
 - 实现 HTTP 到 MCP 的协议转换，支持 initialize、tools/list、tools/call，提供 SSE 与 Streamable HTTP 双传输，支持 path/query/body 字段映射，以及 OpenAPI 导入生成 Tool 与 schema。
 - 使用 Spring Modulith 治理项目代码，按模块化单体划分领域并约束模块依赖，便于后续重构与按能力拆分为微服务。
 

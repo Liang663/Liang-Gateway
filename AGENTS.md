@@ -9,10 +9,14 @@
 | `docs/v1-plan.md` | 第一版产品做/不做、技术栈、简历口径、实现顺序 |
 | `docs/references/domains.md` | 领域：`core` / `access` / `ai`，编排入口 `orchestration` |
 | `docs/spec-gateway-core.md` | core 长期真相源 |
-| `docs/plan-gateway-core.md` | core 第一版落地计划（编码会话从这里做） |
+| `docs/plan-gateway-core.md` | core 第一版落地计划 |
+| `docs/spec-gateway-access.md` | access 长期真相源 |
+| `docs/plan-gateway-access.md` | access 第一版落地计划 |
+| `docs/sql-gateway-user.md` | 用户、访问令牌、大模型 Key 表结构 |
+| `docs/research-higress-token-limit.md` | Higress Token 限制调研（已吸收，口径以 Spec / SQL 为准） |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
 
-尚未撰写：`spec`/`plan` for access、ai。
+尚未撰写：`spec`/`plan` for ai、orchestration。
 
 ## 2. 项目约定
 

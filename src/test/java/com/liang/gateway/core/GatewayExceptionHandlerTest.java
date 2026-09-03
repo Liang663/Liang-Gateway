@@ -1,6 +1,8 @@
 package com.liang.gateway.core;
 
 import com.liang.gateway.core.support.TestPipelineConfiguration;
+import com.liang.gateway.support.TestTokens;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -21,6 +24,13 @@ class GatewayExceptionHandlerTest {
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @BeforeEach
+    void authorize() {
+        webTestClient = webTestClient.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.BEARER)
+                .build();
+    }
 
     @Test
     @DisplayName("未注册路径是 404 not_found 而不是 500")

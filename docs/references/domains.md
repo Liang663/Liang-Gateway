@@ -56,15 +56,15 @@ orchestration    core, access, ai
 
 1. **access（Security）**：Key 无效则请求到不了后面。只解决进门，不算额度。
 2. **orchestration**：数据面入口，开始编排。
-3. **ai**：看 Chat 请求，给出「转到哪、是否流式、预估相关信息、响应里怎么读 usage」。不管 Key 和 Redis。
-4. **access**：用预估做额度检查，不够则 429。orchestration 来调，不是 core 来调。
+3. **ai**：看 Chat 请求，给出「转到哪、是否流式、响应里怎么读 usage」。不管 Key 和 Redis。
+4. **access**：按已用量做额度检查，不够则 429；Redis 不可用则 503。orchestration 来调，不是 core 来调。
 5. **core**：按 ai 给出的上游做反代（可 SSE）。
 6. **ai**：从响应里读出实际用量（协议细节）。
 7. **access**：按实际 Token 计数。
 
-MCP 同理：orchestration 调 access 额度 → 调 ai 处理 JSON-RPC / Tool HTTP → 必要时再调 core 转发或由 ai 自己出站（Tool 不是「一个固定 LLM 上游」）。orchestration 仍然不写映射和 session。
+MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JSON-RPC / Tool HTTP → 必要时再调 core 转发或由 ai 自己出站（Tool 不是「一个固定 LLM 上游」）。没有 `usage` 则不记 Token。orchestration 仍然不写映射和 session。
 
-**管理接口不是数据面：** `/admin/consumers` 仍在 access，`/admin` 下 MCP 配置仍在 ai。Health 在 core。
+**管理接口不是数据面：** 用户与令牌管理在 access，`/admin` 下 MCP 配置仍在 ai。Health 在 core。
 
 ---
 
@@ -74,13 +74,13 @@ MCP 同理：orchestration 调 access 额度 → 调 ai 处理 JSON-RPC / Tool H
 
 链、单 URL 反代、Health、502/500。第一版路由对业务来说就是 orchestration 的 Controller 映射；core 不造注册中心和 LB。  
 不拥有：额度、Chat/MCP 语义。  
-落地：`spec-gateway-core.md`、`plan-gateway-core.md`。
+落地：`spec-gateway-core.md`、`plan-gateway-core.md`。access：`spec-gateway-access.md`、`plan-gateway-access.md`。
 
 ### access
 
-consumer 表、限额配置、Redis 窗口、**额度检查 / 计数的 API**、Security、`/admin/consumers`。  
+`user` / `user_access_token` / `usage_record`、限额配置、Redis 当前段计数、**额度检查 / 计数 / 用量查询 API**、Security、用户与令牌管理 HTTP。  
 Security ≠ 额度。额度必须提供给 orchestration 调用。  
-不拥有：反代、模型协议。
+不拥有：反代、模型协议、大模型 Key 主数据。
 
 ### ai
 
@@ -99,10 +99,12 @@ Chat 如何理解、上游是谁、TTFT/usage 如何从协议里读；MCP 的表
 
 | 存储 | 所有者 |
 |---|---|
-| `gw_consumer`、限额 Redis | access |
-| DeepSeek 配置 | ai |
+| `user`、`user_access_token`、`usage_record`、限额 Redis | access |
+| `llm_apikey_config` | ai |
 | `gw_mcp_*` | ai |
 | 无 | orchestration、core（core 可有代理超时 yml） |
+
+表结构真相源：`docs/sql-gateway-user.md`。关系：`user` 1:N `user_access_token` N:1 `llm_apikey_config`；`usage_record` 归属令牌。对外凭证是 `access_token`，不是 `code`。
 
 ---
 
@@ -120,7 +122,7 @@ Chat 如何理解、上游是谁、TTFT/usage 如何从协议里读；MCP 的表
 
 1. 四个 `package-info` + verify（`orchestration` 空壳）
 2. **core**（`plan-gateway-core.md`）：应用能起、Health、链、单 URL 反代。后面所有流量都要过这里。
-3. **access**：Security + consumer + 额度/计数 API。不依赖 core/ai，但 orchestration 和本地联调需要「进门 + 额度」。
+3. **access**：Security + 用户/令牌 + 额度/计数 API。不依赖 core/ai，但 orchestration 和本地联调需要「进门 + 额度」。
 4. **ai**：先 Chat 协议 API（组上游、读 usage），再 MCP。仍无数据面 HTTP。
 5. **orchestration**：接上 `POST /v1/chat/completions`，串通一次 Chat；再接 MCP。
 6. 种子数据、README、补测试

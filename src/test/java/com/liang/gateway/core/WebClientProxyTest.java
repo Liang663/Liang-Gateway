@@ -3,6 +3,7 @@ package com.liang.gateway.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.liang.gateway.core.support.TestPipelineConfiguration;
+import com.liang.gateway.support.TestTokens;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -41,6 +42,13 @@ class WebClientProxyTest {
     private MockWebServer mockWebServer;
 
     @BeforeEach
+    void authorize() {
+        webTestClient = webTestClient.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.BEARER)
+                .build();
+    }
+
+    @BeforeEach
     void setUp() throws IOException {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
@@ -64,7 +72,6 @@ class WebClientProxyTest {
                 .uri("/__test__/pipeline")
                 .header("X-Upstream-Url", upstreamUrl())
                 .header("X-Upstream-Stream", "false")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer inbound-secret")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{\"hello\":\"world\"}")
                 .exchange()
@@ -120,7 +127,6 @@ class WebClientProxyTest {
                 .uri("/__test__/pipeline")
                 .header("X-Upstream-Url", upstreamUrl())
                 .header("X-Upstream-Stream", "false")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer inbound-secret")
                 .header("X-Upstream-Extra-Authorization", "Bearer upstream-key")
                 .exchange()
                 .expectStatus()
