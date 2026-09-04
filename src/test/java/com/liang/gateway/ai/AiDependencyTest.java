@@ -18,4 +18,21 @@ class AiDependencyTest {
             .dependOnClassesThat()
             .resideInAnyPackage(
                     "com.liang.gateway.access..", "com.liang.gateway.core..", "com.liang.gateway.orchestration..");
+
+    @ArchTest
+    static final ArchRule mcpDoesNotDependOnChatOrAccessApi = noClasses()
+            .that()
+            .resideInAPackage("com.liang.gateway.ai.internal.mcp..")
+            .should()
+            .dependOnClassesThat()
+            .haveNameMatching(".*(ChatApi|ChatUpstream|ChatUsage|DefaultChatApi|AccessApi)$");
+
+    @ArchTest
+    static final ArchRule mcpDoesNotDependOnChatPackages = noClasses()
+            .that()
+            .resideInAPackage("com.liang.gateway.ai.internal.mcp..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                    "com.liang.gateway.ai.internal.application..", "com.liang.gateway.ai.internal.web..");
 }

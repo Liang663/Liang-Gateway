@@ -1,6 +1,6 @@
 # Spec｜AI 协议（ai）
 
-> 定位：ai 长期真相源。本轮只做 Chat；MCP 另开 Plan。落地见 `docs/plan-gateway-ai.md`。表见 `docs/sql-gateway-user.md`。
+> 定位：ai 内 Chat 子域长期真相源。MCP 见 `docs/spec-gateway-mcp.md`。落地见 `docs/plan-gateway-ai.md`。表见 `docs/sql-gateway-user.md`。
 
 ## 0. 元信息
 
@@ -33,7 +33,8 @@
 - 反向代理拷流、TTFT **计时**（orchestration 在发出到第一帧之间打点，把毫秒交给本领域落日志）。
 - 调用方限额、用量明细、Redis 窗口（access）。
 - 数据面 HTTP 入口（orchestration）。
-- MCP、内容审核、多供应商实现（目录允许登记，第一版只实现 DeepSeek 适配）。
+- MCP（`docs/spec-gateway-mcp.md`：与 Chat 并列，不共享 QPM/限额）。
+- 内容审核、多供应商实现（目录允许登记，第一版只实现 DeepSeek 适配）。
 - 定时探活、熔断、按小时/日预聚合表。
 
 ### 依赖领域

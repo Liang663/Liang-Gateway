@@ -7,7 +7,7 @@
 ```
 core     网关转发：过滤器链、单 URL 反代、Health
 access   调用方：鉴权、金额窗口、模型授权、记账（Security 只解决进不进得来）
-ai       Chat 协议（组上游、usage、计价）；MCP 后置
+ai       Chat 协议（组上游、usage、计价）；MCP 协议转换（与 Chat 并列，不共享限额）
 orchestration    编排：一次调用按序调上面三个，自己不写 Redis / 不写拷流 / 不写模型协议
 ```
 
@@ -62,7 +62,15 @@ orchestration    core, access, ai
 6. **ai**：读 usage，按目录官方单价算分。流式强制 `include_usage=true`。编排把本笔成败与耗时交给 ai 写入出站日志。
 7. **access**：按真实 usage 记 Token 与金额（一次加上本笔分，并把 Redis 新已用回写限额行）。
 
-MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JSON-RPC / Tool HTTP → 必要时再调 core 转发或由 ai 自己出站。MCP 无模型 usage 则不走 Chat 记账。orchestration 仍然不写映射和 session。
+MCP **不是** Chat 的简化版。QPM / 金额窗只服务模型调用。MCP 链：
+
+1. **access（Security）**：要进数据面仍须合法访问令牌。不做 `checkQuota`、不打 QPM、不记金额。
+2. **orchestration**：`POST /{path}/mcp`，校验 MCP 传输头后交给 ai。
+3. **ai（mcp 子包）**：`server/discover` / `tools/list` / `tools/call`；call 组业务 HTTP 或直接给出带原因的失败。
+4. **core**：仅 call 且需要出站时转发。
+5. **ai**：把上游状态和正文收成 MCP 结果；失败写清原因。
+
+orchestration 不写映射、不写 JSON-RPC。MCP 与 Chat 各走各的编排，互不调用。
 
 **管理接口不是数据面：** 用户与令牌管理在 access，`/admin` 下 MCP 配置仍在 ai。Health 在 core。
 
@@ -83,14 +91,13 @@ MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JS
 
 ### ai
 
-模型目录与官方单价、出站 Key、组上游、读 usage 并计价、出站调用日志。MCP 后置。  
-不拥有：验访问令牌、金额窗口、通用拷流、TTFT 计时（只收编排算好的毫秒）。  
-内部可分子包 `chat` / `mcp`，暂不拆 Modulith 模块。
+内部两个并列子包，暂不拆 Modulith 模块：`chat`（模型目录、出站 Key、组上游、usage、计价、出站日志）；`mcp`（服务器与工具目录、2026 JSON-RPC、组工具 HTTP、包装失败原因）。  
+不拥有：验访问令牌、金额窗口、QPM、通用拷流、TTFT 计时。`chat` 与 `mcp` 互不 import。
 
 ### orchestration
 
-数据面 Controller 与应用服务：**只排序调用**。把 ai 的「去哪」转成 core 的 `Upstream`，打 TTFT，把出站结果交给 ai 记日志，把 ai 读出的用量交给 access。  
-不拥有：表、Redis、WebClient 拷流实现、JSON-RPC 状态机。
+数据面 Controller 与应用服务：**只排序调用**。Chat 链：额度 → 组上游 → 转发 → 日志与记账。MCP 链：进门后不查额度，组工具请求 → 转发 → 包装结果。  
+不拥有：表、Redis、WebClient 拷流实现、JSON-RPC 状态机、参数映射。
 
 ---
 
@@ -100,16 +107,16 @@ MCP 同理：orchestration 调 access 额度（至少 QPM）→ 调 ai 处理 JS
 |---|---|
 | `user`、`user_access_token`、`user_access_token_model`、`usage_limit`、`usage_record`、限额 Redis | access |
 | `llm_apikey_config`、`llm_model`、`llm_call_log` | ai |
-| `gw_mcp_*` | ai |
+| `mcp_server`、`mcp_tool` | ai |
 | 无 | orchestration、core（core 可有代理超时 yml） |
 
-表结构真相源：`docs/sql-gateway-user.md`。令牌授权模型名，不对 `llm_model` 建外键。出站 Key 挂在模型上。对外凭证是 `access_token`。
+表结构真相源：`docs/sql-gateway-user.md`、`docs/sql-gateway-mcp.md`。令牌授权模型名，不对 `llm_model` 建外键。出站 Key 挂在模型上。对外凭证是 `access_token`。MCP 路径亮 `mcp_server.path`。
 
 ---
 
 ## 6. 以后再拆
 
-- `ai` 里 Chat 与 MCP 互相污染时，拆 `llm` + `mcp`；orchestration 多依赖一个模块即可。
+- `ai` 里 `chat` 与 `mcp` 互相污染时，拆成两个 Modulith 模块；orchestration 多依赖一个即可。
 - `core` 要上注册中心 / 多种 LB 时再拆。
 - 基础设施模块：WebClient/JPA/Redis 封装出现多处复制再抽。
 

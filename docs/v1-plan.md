@@ -18,7 +18,10 @@
 | [plan-gateway-access.md](plan-gateway-access.md) | access 第一版编码计划 | 已实现 |
 | [plan-gateway-access-billing.md](plan-gateway-access-billing.md) | 金额限额与模型授权 | 已实现 |
 | [sql-gateway-user.md](sql-gateway-user.md) | 用户、令牌、限额、模型、用量、出站日志 | 生效 |
+| [sql-gateway-mcp.md](sql-gateway-mcp.md) | MCP 服务器与工具 | 生效 |
 | [spec-gateway-ai.md](spec-gateway-ai.md) | ai Chat Spec | 生效 |
+| [spec-gateway-mcp.md](spec-gateway-mcp.md) | MCP 协议转换 Spec | 生效 |
+| [plan-gateway-mcp.md](plan-gateway-mcp.md) | MCP 编码计划 | 已实现 |
 | [plan-gateway-ai.md](plan-gateway-ai.md) | ai Chat 编码计划 | 已实现 |
 | [research-higress-token-limit.md](research-higress-token-limit.md) | Higress Token 限制调研（已吸收） | 参考 |
 
@@ -39,7 +42,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 1. `POST /v1/chat/completions`：调用方带 `model` 与拼好的 `messages`（及其余字段原样转发），非流式与 SSE 真流式打到所配供应商（第一版 DeepSeek），chunk 随到随转。
 2. 流式记录 TTFT（发出上游请求到第一帧）与总耗时，写入出站日志；结束后按 `usage` 记 Token 与金额（分），按模型名分组。
 3. 无合法 API Key → 401；超额 → 429；额度 Redis 不可用 → 503。
-4. HTTP API 可配成 MCP Tool；`initialize` / `tools/list` / `tools/call`；SSE 与 Streamable HTTP。
+4. HTTP API 可配成 MCP Tool；协议 `2026-07-28`：`server/discover` / `tools/list` / `tools/call`；`POST /{path}/mcp`。不做 QPM/限额。工具失败返回具体原因。
 5. 热路径不在 Netty 事件循环上跑 JPA / 同步 JDBC。
 
 **不做**
@@ -88,7 +91,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 ```
 core     {}                         网关转发：链、单 URL 反代、Health
 access   {}                         调用方：Security + 金额窗口 + 模型授权 + 记账
-ai       {}                         Chat 协议（MCP 后置）
+ai       {}                         Chat 协议 + MCP 协议转换（子包并列，不共享限额）
 orchestration    core, access, ai           编排：数据面入口，只排序调用
 ```
 
@@ -102,11 +105,11 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 **access：** Security 只验进门。金额限额在 `usage_limit`（分；可不限额或五小时/七天窗）、QPM、令牌授权模型名。判超限读 Redis，写时回写已用。明细记 Token 与金额，按模型名分组。不读单价、不做出站。
 
-**ai：** 模型目录与官方单价、出站 Key、组上游（body 透传）、读 usage 并算分、出站调用日志（TTFT/故障率按 Key 扫日志）。**没有数据面 HTTP。** MCP 另开 Plan。
+**ai：** Chat：模型目录与官方单价、出站 Key、组上游、读 usage 并算分、出站日志。MCP：`mcp_server` / `mcp_tool`、2026 JSON-RPC、组工具 HTTP、失败原因包装。两套子包并列。**没有数据面 HTTP。**
 
-**orchestration：** `POST /v1/chat/completions` 与 MCP 数据面入口；按序调 access → ai → core → ai 记出站日志 → access 记账。不写业务算法。
+**orchestration：** Chat：`POST /v1/chat/completions`，额度 → 组上游 → 转发 → 日志与记账。MCP：`POST /{path}/mcp`，进门后不查额度，组工具请求 → 转发 → 包装结果。不写业务算法。
 
-**表：** 见 [sql-gateway-user.md](sql-gateway-user.md)。`gw_mcp_*` 仍待定，归 ai。
+**表：** Chat/调用方见 [sql-gateway-user.md](sql-gateway-user.md)；MCP 见 [sql-gateway-mcp.md](sql-gateway-mcp.md)。归 ai。
 
 **线程：** 事件循环只做非阻塞。JPA 必须 `boundedElastic`。
 
@@ -136,7 +139,7 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 - 针对模型调用构建 OpenAI 兼容接入，支持非流式响应与 SSE 流式透传，记录 TTFT 与端到端耗时。
 - 针对请求构建响应式过滤器链，实现鉴权、额度控制与上游转发。
 - 实现调用方套餐额度：五小时与七天按金额（分）限额；请求前检查授权模型与已用金额，请求后按实际上游 Token 与金额记账，并按模型名分组统计；支持 QPM 防刷与用量明细；Redis 不可用则拒绝服务。
-- 实现 HTTP 到 MCP 的协议转换，支持 initialize、tools/list、tools/call，提供 SSE 与 Streamable HTTP 双传输，支持 path/query/body 字段映射，以及 OpenAPI 导入生成 Tool 与 schema。
+- 实现 HTTP 到 MCP 的协议转换（2026-07-28）：server/discover、tools/list、tools/call；path/query/header/body 映射；OpenAPI 导入生成 Tool；工具失败返回具体原因。
 - 使用 Spring Modulith 治理项目代码，按模块化单体划分领域并约束模块依赖，便于后续重构与按能力拆分为微服务。
 
 ---

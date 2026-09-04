@@ -8,7 +8,7 @@
 - 覆盖：`user`、`user_access_token`、`user_access_token_model`、`usage_limit`、`usage_record`、`llm_apikey_config`、`llm_model`、`llm_call_log`
 - 归属：前五张 → access；`llm_apikey_config`、`llm_model`、`llm_call_log` → ai
 - 关联：`docs/spec-gateway-access.md`、`docs/spec-gateway-ai.md`
-- 不覆盖：MCP 表、额度 Redis 键结构（判超限仍读 Redis，见字段 `usage_limit.used`）
+- 不覆盖：MCP 表（见 `docs/sql-gateway-mcp.md`）、额度 Redis 键结构（判超限仍读 Redis，见字段 `usage_limit.used`）
 
 关系：
 
