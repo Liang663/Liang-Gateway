@@ -1,6 +1,6 @@
 # Spec｜调用方（access）
 
-> 定位：access 长期真相源。表结构见 `docs/sql-gateway-user.md`。已落地的进门与窗口算法见 `docs/plan-gateway-access.md`；金额限额与模型授权见 `docs/plan-gateway-access-billing.md`。
+> 定位：access 长期真相源。表结构见 `docs/sql-gateway-user.md`。
 
 ## 0. 元信息
 
@@ -9,7 +9,7 @@
 - 业务分类：网关
 - 业务主题：调用方
 - 更新时间：2026-09-03
-- 关联：`docs/plan-gateway-access.md`、`docs/plan-gateway-access-billing.md`、`docs/sql-gateway-user.md`、`docs/references/domains.md`
+- 关联：`docs/sql-gateway-user.md`、`docs/references/domains.md`、`docs/v1-plan.md`
 
 ## 1. 背景与目标
 

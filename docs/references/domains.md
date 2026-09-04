@@ -82,7 +82,7 @@ orchestration 不写映射、不写 JSON-RPC。MCP 与 Chat 各走各的编排�
 
 链、单 URL 反代、Health、502/500。第一版路由对业务来说就是 orchestration 的 Controller 映射；core 不造注册中心和 LB。  
 不拥有：额度、Chat/MCP 语义。  
-落地：`spec-gateway-core.md`、`plan-gateway-core.md`。access：`spec-gateway-access.md`、`plan-gateway-access.md`。
+落地：`spec-gateway-core.md`。access：`spec-gateway-access.md`。
 
 ### access
 
@@ -126,11 +126,4 @@ orchestration 不写映射、不写 JSON-RPC。MCP 与 Chat 各走各的编排�
 
 按依赖从底向上：被依赖的先做，编排最后接。三个业务域互不依赖，但 **orchestration 要调它们的 API**，所以不能先做 orchestration。
 
-1. 四个 `package-info` + verify（`orchestration` 空壳）
-2. **core**（`plan-gateway-core.md`）：应用能起、Health、链、单 URL 反代。后面所有流量都要过这里。
-3. **access**：Security + 用户/令牌 + 额度/计数 API。不依赖 core/ai，但 orchestration 和本地联调需要「进门 + 额度」。
-4. **ai**：先 Chat 协议 API（组上游、读 usage），再 MCP。仍无数据面 HTTP。
-5. **orchestration**：接上 `POST /v1/chat/completions`，串通一次 Chat；再接 MCP。
-6. 种子数据、README、补测试
-
-Chat 通了再做 MCP，避免 orchestration 和 ai 同时摊开两套协议。core 的 Plan 不要实现 orchestration。
+数据面已接上。剩余：种子数据与补测试。

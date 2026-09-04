@@ -1,6 +1,6 @@
 # Spec｜AI 协议（ai）
 
-> 定位：ai 内 Chat 子域长期真相源。MCP 见 `docs/spec-gateway-mcp.md`。落地见 `docs/plan-gateway-ai.md`。表见 `docs/sql-gateway-user.md`。
+> 定位：ai 内 Chat 子域长期真相源。MCP 见 `docs/spec-gateway-mcp.md`。表见 `docs/sql-gateway-user.md`。
 
 ## 0. 元信息
 
@@ -9,7 +9,7 @@
 - 业务分类：网关
 - 业务主题：AI 协议
 - 更新时间：2026-09-04
-- 关联：`docs/plan-gateway-ai.md`、`docs/sql-gateway-user.md`、`docs/references/domains.md`、`docs/v1-plan.md`
+- 关联：`docs/sql-gateway-user.md`、`docs/references/domains.md`、`docs/v1-plan.md`
 
 ## 1. 背景与目标
 

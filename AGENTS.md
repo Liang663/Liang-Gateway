@@ -1,30 +1,24 @@
 # AGENTS.md｜项目协作约定
 
-开发者和 Agent 沿 `AGENTS.md -> Spec / Plan -> 代码` 取上下文。产品边界以 `docs/v1-plan.md` 为准；领域切分以 `docs/references/domains.md` 为准。
+开发者和 Agent 沿 `AGENTS.md -> Spec -> 代码` 取上下文。产品边界以 `docs/v1-plan.md` 为准；领域切分以 `docs/references/domains.md` 为准。
 
 ## 1. 文档导航
 
 | 文档 | 职责 |
 | --- | --- |
-| `docs/v1-plan.md` | 第一版产品做/不做、技术栈、简历口径、实现顺序 |
+| `README.md` | 极简入口：项目是什么、如何启动和验证 |
+| `docs/v1-plan.md` | 第一版产品做/不做、技术栈、简历口径 |
 | `docs/references/domains.md` | 领域：`core` / `access` / `ai`，编排入口 `orchestration` |
 | `docs/spec-gateway-core.md` | core 长期真相源 |
-| `docs/plan-gateway-core.md` | core 第一版落地计划 |
 | `docs/spec-gateway-access.md` | access 长期真相源 |
-| `docs/plan-gateway-access.md` | access 第一版落地计划（已完成） |
-| `docs/plan-gateway-access-billing.md` | access 金额限额与模型授权（已完成） |
 | `docs/spec-gateway-ai.md` | ai Chat 长期真相源 |
 | `docs/spec-gateway-mcp.md` | ai MCP 协议转换长期真相源 |
-| `docs/plan-gateway-mcp.md` | ai MCP 第一版落地计划（已完成） |
-| `docs/plan-gateway-ai.md` | ai Chat 第一版落地计划（已完成） |
 | `docs/spec-gateway-orchestration.md` | 编排数据面长期真相源 |
-| `docs/plan-gateway-orchestration.md` | 编排数据面落地计划 |
 | `docs/sql-gateway-user.md` | 用户、令牌、限额、模型、用量、出站日志表结构 |
 | `docs/sql-gateway-mcp.md` | MCP 服务器与工具表结构 |
-| `docs/research-higress-token-limit.md` | Higress Token 限制调研（已吸收，口径以 Spec / SQL 为准） |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
 
-尚未撰写：无（第一版领域文档已齐）。
+进行中的落地计划才进导航。第一版领域 Plan 已吸收进对应 Spec。
 
 ## 2. 项目约定
 

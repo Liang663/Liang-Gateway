@@ -9,7 +9,7 @@
 - 业务分类：网关
 - 业务主题：MCP
 - 更新时间：2026-09-03
-- 关联：`docs/sql-gateway-mcp.md`、`docs/plan-gateway-mcp.md`、`docs/references/domains.md`、`docs/v1-plan.md`、`docs/spec-gateway-ai.md`
+- 关联：`docs/sql-gateway-mcp.md`、`docs/references/domains.md`、`docs/v1-plan.md`、`docs/spec-gateway-ai.md`
 
 ## 1. 背景与目标
 

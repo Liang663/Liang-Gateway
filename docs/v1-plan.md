@@ -1,8 +1,8 @@
 # Liang-Gateway 第一版
 
-产品边界与实现的**索引**。细节按专题拆到 `docs/references/`。
+产品边界与实现的**索引**。领域切分见 [domains.md](references/domains.md)；某一刀怎么写以对应 Spec / SQL 为准。
 
-**改设计必须同步改文档。** 冲突时：做 / 不做以本文为准；领域切分以 [domains.md](references/domains.md) 为准；某一刀怎么写代码以对应 reference 为准。
+**改设计必须同步改文档。** 冲突时：做 / 不做以本文为准。
 
 ---
 
@@ -10,24 +10,17 @@
 
 | 文档 | 内容 | 状态 |
 |---|---|---|
-| [v1-plan.md](v1-plan.md) | 目标、非目标、技术栈、简历、实现顺序 | 现行 |
+| [v1-plan.md](v1-plan.md) | 目标、非目标、技术栈、简历 | 现行 |
 | [references/domains.md](references/domains.md) | `core` / `access` / `ai` + 编排入口 `orchestration` | 现行 |
 | [spec-gateway-core.md](spec-gateway-core.md) | core 长期 Spec | 生效 |
-| [plan-gateway-core.md](plan-gateway-core.md) | core 第一版编码计划 | 已实现 |
 | [spec-gateway-access.md](spec-gateway-access.md) | access 长期 Spec | 生效 |
-| [plan-gateway-access.md](plan-gateway-access.md) | access 第一版编码计划 | 已实现 |
-| [plan-gateway-access-billing.md](plan-gateway-access-billing.md) | 金额限额与模型授权 | 已实现 |
 | [sql-gateway-user.md](sql-gateway-user.md) | 用户、令牌、限额、模型、用量、出站日志 | 生效 |
 | [sql-gateway-mcp.md](sql-gateway-mcp.md) | MCP 服务器与工具 | 生效 |
 | [spec-gateway-ai.md](spec-gateway-ai.md) | ai Chat Spec | 生效 |
 | [spec-gateway-mcp.md](spec-gateway-mcp.md) | MCP 协议转换 Spec | 生效 |
-| [plan-gateway-mcp.md](plan-gateway-mcp.md) | MCP 编码计划 | 已实现 |
-| [plan-gateway-ai.md](plan-gateway-ai.md) | ai Chat 编码计划 | 已实现 |
 | [spec-gateway-orchestration.md](spec-gateway-orchestration.md) | 编排数据面 Spec | 生效 |
-| [plan-gateway-orchestration.md](plan-gateway-orchestration.md) | 编排数据面编码计划 | 已实现 |
-| [research-higress-token-limit.md](research-higress-token-limit.md) | Higress Token 限制调研（已吸收） | 参考 |
 
-已取消：独立 `llm` / `mcp` / `metering` / `admin` 模块文档。MCP 与 Chat 同属 `ai`。
+已取消：独立 `llm` / `mcp` / `metering` / `admin` 模块文档。MCP 与 Chat 同属 `ai`。第一版领域 Plan 与 Higress 调研已吸收进 Spec / SQL。
 
 ---
 
@@ -101,9 +94,9 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 ---
 
-## 4. 尚未拆出的专题（摘要）
+## 4. 领域摘要
 
-**core：** 过滤器链、Health、通用 WebClient 反代（单 URL，无注册中心/LB）。第一版路由就是 Controller 映射。详见 [spec-gateway-core.md](spec-gateway-core.md)、[plan-gateway-core.md](plan-gateway-core.md)。
+**core：** 过滤器链、Health、通用 WebClient 反代（单 URL，无注册中心/LB）。第一版路由就是 Controller 映射。详见 [spec-gateway-core.md](spec-gateway-core.md)。
 
 **access：** Security 只验进门。金额限额在 `usage_limit`（分；可不限额或五小时/七天窗）、QPM、令牌授权模型名。判超限读 Redis，写时回写已用。明细记 Token 与金额，按模型名分组。不读单价、不做出站。
 
@@ -119,13 +112,9 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 ## 5. 实现顺序
 
-1. 领域划分（本文 + [domains.md](references/domains.md)）
-2. 四个 `package-info` + `ApplicationModules.verify()`
-3. **core**（应用能起、链、反代）见 [plan-gateway-core.md](plan-gateway-core.md)
-4. **access**（进门 + 额度 API）
-5. **access 金额/授权**（`plan-gateway-access-billing.md`）与 **ai Chat**（`plan-gateway-ai.md`）
-6. **orchestration**：先扩 core 转发合同，再串 Chat，再接 MCP 数据面（见 `plan-gateway-orchestration.md`）
-7. 种子、README、补测试
+1–6 已完成：领域划分、四模块 verify、core、access（含金额/授权）、ai Chat 与 MCP API、orchestration 数据面。
+
+剩余：种子数据、补测试。
 
 ---
 
@@ -151,5 +140,5 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 2. 不要 Servlet 数据面、SCG、多厂商、内容审核、Spring AI。
 3. 不要提交 `config/application-local.yml`。
 4. 不要独立 `llm` / `mcp` / `metering` / `admin` / `infrastructure` 包。业务域不要互相依赖。
-5. `core` / `access` / `ai` 不得互相 import；只有 `orchestration` 依赖这三者。`orchestration` 不得实现配额、拷流、JSON-RPC。
+5. `core` / `access` / `ai` 不得互相 import；只有 `orchestration` 依赖这三者。`orchestration` 不得实现配额、拷流、工具参数映射；JSON-RPC 信封可组，method 语义在 ai。
 6. 流式禁止 `collectList` / `block`。热路径禁止同步 JPA。

@@ -1,6 +1,6 @@
 # Spec｜网关核心（core）
 
-> 定位：core 长期真相源。类名与任务步骤见 `docs/plan-gateway-core.md`。
+> 定位：core 长期真相源。
 
 ## 0. 元信息
 
@@ -9,7 +9,7 @@
 - 业务分类：网关
 - 业务主题：核心
 - 更新时间：2026-09-04
-- 关联：`docs/plan-gateway-core.md`、`docs/references/domains.md`、`docs/v1-plan.md`
+- 关联：`docs/references/domains.md`、`docs/v1-plan.md`
 
 ## 1. 背景与目标
 
@@ -47,7 +47,7 @@
 - **过滤器链：** 领域外可挂过滤器，按顺序执行；可放行或短路。
 - **反向代理：** 领域外指定 URL、出站头，以及可选的 method/body/timeout。可写入入站响应（透传），或只捕获状态与正文交还调用方。流式可按帧观察；可声明客户端断开后仍读完上游。显式转发与过滤器链并列，不必经过链末隐式反代。
 - **健康探测：** 进程存活可被探测。
-- **失败映射：** 未处理异常与上游失败有稳定 JSON 错误形态。
+- **失败映射：** 未处理异常与上游失败有稳定 JSON 错误形态（`error.message` 与 `error.type`）。
 
 不公开：身份、额度、Chat/MCP 协议。编排不在本领域。
 

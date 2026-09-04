@@ -9,7 +9,7 @@
 - 业务分类：网关
 - 业务主题：编排
 - 更新时间：2026-09-04
-- 关联：`docs/plan-gateway-orchestration.md`、`docs/references/domains.md`、`docs/v1-plan.md`
+- 关联：`docs/references/domains.md`、`docs/v1-plan.md`
 
 ## 1. 背景与目标
 
@@ -54,8 +54,8 @@
 - 流式强制 `include_usage` 已在 ai `prepare` 写入出站 body。本领域必须转发 **`ChatUpstream.body`**，不得把入站 body 原样交给 core。
 - `recordCallLog` 使用本次 `prepare` 给出的出站 Key code。组上游产物必须带该 code（不含 secret）。
 - Chat 流式禁止 `collectList`。TTFT = 发出上游到第一帧（`isFirstContentFrame`）。客户端断开后仍读上游直到 usage 或结束。第一帧之前取消且 drain 也无 usage：不写日志、不记账。
-- `GET /v1/models` 只做授权名与目录启用名求交，不调 `checkQuota`。
-- MCP 链必须：**不**调用 `checkQuota` / `recordUsage`。校验 Origin（配置允许列表）、`MCP-Protocol-Version`、`Mcp-Method`（与 JSON-RPC method 一致）、`tools/call` 时 `Mcp-Name` 与 `params.name` 一致、一次一条 JSON-RPC。版本只允许 `2026-07-28`。
+- `GET /v1/models` 只做授权名与目录启用名求交，不调 `checkQuota`。响应为 OpenAI 列表形，条目只含 id，无单价、无 secret。
+- MCP 链必须：**不**调用 `checkQuota` / `recordUsage`。校验 Origin（配置允许列表）、`MCP-Protocol-Version`、`Mcp-Method`（与 JSON-RPC method 一致）、`tools/call` 时 `Mcp-Name` 与 `params.name` 一致、一次一条 JSON-RPC。版本只允许 `2026-07-28`。协议层失败写 JSON-RPC error（非法信封 400；版本不对 400 且列出 supported；未实现 method 含 `initialize` 为 404 + `-32601`；server 不存在 404）。工具层 `isError` 仍 HTTP 200。Origin 不在允许列表 → 403；`Accept` 须同时含 json 与 event-stream。
 - MCP `tools/call` 的上游响应 **不得** 当作 HTTP 响应透传给 Agent；必须 `wrapCall` 后再写 JSON-RPC。金额窗已满的令牌仍可走 MCP。
 - 入站 `Authorization` 不得进入出站（core 默认不转发；本领域不得把它塞进 extraHeaders）。
 - 本领域无表。
