@@ -35,6 +35,6 @@
 
 ## 3. 经验避坑
 
-- 本地 MySQL 用开发机实例；Redis 用 `docs/dev-ops/docker-compose.yml` 官方镜像。
+- MySQL / Redis 用 `docs/dev-ops/docker-compose.yml` 官方镜像（3307 / 6379，数据卷持久化）。`mvn test` 连 `liang_gateway_test`，不要用一次性 Testcontainers。
 - Docker / MySQL 的 Skill 或 MCP 只用 GitHub 官方发布。
 - 入站调用方 `Authorization` 不得默认转到模型上游。

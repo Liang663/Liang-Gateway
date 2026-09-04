@@ -1,6 +1,24 @@
-# Redis only. MySQL runs on the host, not in Docker.
-# Official image: https://hub.docker.com/_/redis
+# Official images: https://hub.docker.com/_/mysql  https://hub.docker.com/_/redis
+# Host port 3307 avoids colliding with a machine-local MySQL on 3306.
+# Tests use liang_gateway_test; a local app can use liang_gateway on the same instance.
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: liang-gateway-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: liang
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - liang-gateway-mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pliang"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   redis:
     image: redis:7-alpine
     container_name: liang-gateway-redis
@@ -11,4 +29,5 @@ services:
       - liang-gateway-redis-data:/data
 
 volumes:
+  liang-gateway-mysql-data:
   liang-gateway-redis-data:

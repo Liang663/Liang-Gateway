@@ -8,9 +8,9 @@ Java AI 网关：OpenAI 兼容 Chat 转发、HTTP→MCP（2026-07-28）、调用
 
 ### 环境要求
 
-- Java 21、Maven
-- 本机 MySQL 8（库名 `liang_gateway`）
-- Redis：`docs/dev-ops/docker-compose.yml` 官方镜像
+- Java 21、Maven、Docker
+- MySQL 8 与 Redis：`docs/dev-ops/docker-compose.yml` 官方镜像（数据卷持久化）
+- 本机 MySQL 可选，不参与 `mvn test`
 
 ### 最小启动
 
@@ -19,7 +19,7 @@ docker compose -f docs/dev-ops/docker-compose.yml up -d
 copy config\application-local.yml.example config\application-local.yml
 ```
 
-在 `config/application-local.yml` 填入本机 MySQL 密码和管理令牌。不要提交该文件。
+在 `config/application-local.yml` 填入数据源。连 compose 里的 MySQL 时用 `127.0.0.1:3307`、用户 `root`、密码 `liang`、库 `liang_gateway`。不要提交该文件。
 
 ```bash
 mvn spring-boot:run
@@ -27,8 +27,11 @@ mvn spring-boot:run
 
 ### 最小验证
 
+先起 compose，再测。测试写进 **`liang_gateway_test`（端口 3307）**，测完数据还在，不会进本机 3306。
+
 ```bash
 mvn test
+docker exec liang-gateway-mysql mysql -uroot -pliang -e "USE liang_gateway_test; SHOW TABLES; SELECT COUNT(*) FROM user;"
 curl http://127.0.0.1:8080/health
 ```
 

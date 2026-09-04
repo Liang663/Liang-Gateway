@@ -3,9 +3,10 @@
 
 spring:
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/liang_gateway?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    # Compose MySQL: 127.0.0.1:3307, user root, password liang, database liang_gateway
+    url: jdbc:mysql://127.0.0.1:3307/liang_gateway?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: your-local-mysql-password
+    password: liang
   data:
     redis:
       host: 127.0.0.1

@@ -1,2 +1,12 @@
 gateway:
   admin-token: test-admin-token
+
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3307/liang_gateway_test?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: liang
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379

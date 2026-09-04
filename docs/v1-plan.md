@@ -75,7 +75,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 | 测试 | JUnit 5、AssertJ、WebTestClient、Modulith verify |
 | 禁止 | Spring AI、LangChain4j、Spring Cloud*、SCG、Sentinel、Lombok |
 
-启动类 `com.liang.gateway.GatewayApplication`。密钥只在 gitignore 的 `config/application-local.yml`。MySQL 用本机；Redis 用 [dev-ops/docker-compose.yml](dev-ops/docker-compose.yml) 官方镜像。
+启动类 `com.liang.gateway.GatewayApplication`。密钥只在 gitignore 的 `config/application-local.yml`。MySQL 与 Redis 用 [dev-ops/docker-compose.yml](dev-ops/docker-compose.yml) 官方镜像（测试库 `liang_gateway_test`，端口 3307）。
 
 ---
 
