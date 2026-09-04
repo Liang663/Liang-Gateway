@@ -65,7 +65,7 @@ orchestration    core, access, ai
 MCP **不是** Chat 的简化版。QPM / 金额窗只服务模型调用。MCP 链：
 
 1. **access（Security）**：要进数据面仍须合法访问令牌。不做 `checkQuota`、不打 QPM、不记金额。
-2. **orchestration**：`POST /{path}/mcp`，校验 MCP 传输头后交给 ai。
+2. **orchestration**：`POST /mcp/{path}`，校验 MCP 传输头后交给 ai。
 3. **ai（mcp 子包）**：`server/discover` / `tools/list` / `tools/call`；call 组业务 HTTP 或直接给出带原因的失败。
 4. **core**：仅 call 且需要出站时转发。
 5. **ai**：把上游状态和正文收成 MCP 结果；失败写清原因。

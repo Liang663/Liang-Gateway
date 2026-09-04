@@ -23,3 +23,5 @@ gateway:
     max-in-memory-size: 16MB
   quota:
     key-prefix: gw:quota
+  mcp:
+    allowed-origins: []

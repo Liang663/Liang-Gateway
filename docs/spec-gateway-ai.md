@@ -8,7 +8,7 @@
 - 文档状态：生效
 - 业务分类：网关
 - 业务主题：AI 协议
-- 更新时间：2026-09-03
+- 更新时间：2026-09-04
 - 关联：`docs/plan-gateway-ai.md`、`docs/sql-gateway-user.md`、`docs/references/domains.md`、`docs/v1-plan.md`
 
 ## 1. 背景与目标
@@ -48,7 +48,7 @@
 ## 3. 公开能力
 
 - **模型目录：** 可查询已启用模型及其单价；可维护模型与出站 Key。
-- **组上游：** 给定模型名与调用方请求体，给出 URL、出站头、要转发的 body、是否流式。
+- **组上游：** 给定模型名与调用方请求体，给出 URL、出站头、要转发的 body、是否流式、出站 Key 的 code（供编排写日志，不含 secret）。
 - **读用量与计价：** 从上游响应或 SSE 帧得到 prompt/completion Token，并给出本次金额（分）。
 - **出站日志：** 编排传入本笔成败、耗时与说明后落库；可按出站 Key 查询。
 
@@ -67,7 +67,7 @@
 ## 5. 设计重点
 
 - 模型绑定 `llm_apikey_config`，不绑访问令牌。编排把请求里的 `model` 交给本领域即可。
-- 组上游产物含 url、headers、**body**、stream。body 以本领域返回值为准（流式已强制 `include_usage`）。编排必须转发这份 body。core 通用反代「客户端断开即取消上游」不适用于 Chat 计费路径：Chat 要 drain 到 usage。
+- 组上游产物含 url、headers、**body**、stream、**apikeyCode**（模型绑定的出站 Key code，只读、无 secret）。body 以本领域返回值为准（流式已强制 `include_usage`）。编排必须转发这份 body，并用 apikeyCode 调 `recordCallLog`。core 通用反代「客户端断开即取消上游」不适用于 Chat 计费路径：Chat 要 drain 到 usage。
 - 流式：从**单帧**识别 usage、以及是否为首帧；不 `collectList`，不提供整段 SSE 入口。非流式才从完整 JSON 读 `usage`。
 - 出站日志按出站 Key + 模型记，不含访问令牌、不含金额。金额在 access。第一帧前取消不写日志。失败原因写说明字段，不要再拆失败分类列或 HTTP 状态列。
 - 平均 TTFT、故障率第一版扫日志表。管理面维护目录与 Key；无 UI。
@@ -81,7 +81,7 @@
 
 ## 7. 验收标准
 
-- 已知 DeepSeek 模型可组出带官方 Key 的上游；除强制 `include_usage=true` 外业务字段与入站一致。
+- 已知 DeepSeek 模型可组出带官方 Key 的上游；产物含出站 Key code；除强制 `include_usage=true` 外业务字段与入站一致。toString 不含 secret。
 - `stream=true` 时出站一定含 `include_usage=true`（覆盖调用方的 false）。
 - 未知或禁用模型被拒绝，且不访问 access。
 - 非流式与 SSE 都能解析 usage 并算到分；缺少 usage 的成功响应按需求重点处理，不得静默当 0。

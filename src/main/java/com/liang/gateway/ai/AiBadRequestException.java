@@ -1,4 +1,4 @@
-package com.liang.gateway.ai.internal.application;
+package com.liang.gateway.ai;
 
 public class AiBadRequestException extends RuntimeException {
 

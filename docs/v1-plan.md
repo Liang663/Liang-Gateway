@@ -23,6 +23,8 @@
 | [spec-gateway-mcp.md](spec-gateway-mcp.md) | MCP 协议转换 Spec | 生效 |
 | [plan-gateway-mcp.md](plan-gateway-mcp.md) | MCP 编码计划 | 已实现 |
 | [plan-gateway-ai.md](plan-gateway-ai.md) | ai Chat 编码计划 | 已实现 |
+| [spec-gateway-orchestration.md](spec-gateway-orchestration.md) | 编排数据面 Spec | 生效 |
+| [plan-gateway-orchestration.md](plan-gateway-orchestration.md) | 编排数据面编码计划 | 已实现 |
 | [research-higress-token-limit.md](research-higress-token-limit.md) | Higress Token 限制调研（已吸收） | 参考 |
 
 已取消：独立 `llm` / `mcp` / `metering` / `admin` 模块文档。MCP 与 Chat 同属 `ai`。
@@ -42,7 +44,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 1. `POST /v1/chat/completions`：调用方带 `model` 与拼好的 `messages`（及其余字段原样转发），非流式与 SSE 真流式打到所配供应商（第一版 DeepSeek），chunk 随到随转。
 2. 流式记录 TTFT（发出上游请求到第一帧）与总耗时，写入出站日志；结束后按 `usage` 记 Token 与金额（分），按模型名分组。
 3. 无合法 API Key → 401；超额 → 429；额度 Redis 不可用 → 503。
-4. HTTP API 可配成 MCP Tool；协议 `2026-07-28`：`server/discover` / `tools/list` / `tools/call`；`POST /{path}/mcp`。不做 QPM/限额。工具失败返回具体原因。
+4. HTTP API 可配成 MCP Tool；协议 `2026-07-28`：`server/discover` / `tools/list` / `tools/call`；`POST /mcp/{path}`。不做 QPM/限额。工具失败返回具体原因。
 5. 热路径不在 Netty 事件循环上跑 JPA / 同步 JDBC。
 
 **不做**
@@ -107,7 +109,7 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 **ai：** Chat：模型目录与官方单价、出站 Key、组上游、读 usage 并算分、出站日志。MCP：`mcp_server` / `mcp_tool`、2026 JSON-RPC、组工具 HTTP、失败原因包装。两套子包并列。**没有数据面 HTTP。**
 
-**orchestration：** Chat：`POST /v1/chat/completions`，额度 → 组上游 → 转发 → 日志与记账。MCP：`POST /{path}/mcp`，进门后不查额度，组工具请求 → 转发 → 包装结果。不写业务算法。
+**orchestration：** Chat：`POST /v1/chat/completions`，额度 → 组上游 → 转发 → 日志与记账。MCP：`POST /mcp/{path}`，进门后不查额度，组工具请求 → 捕获上游 → 包装结果。不写业务算法。
 
 **表：** Chat/调用方见 [sql-gateway-user.md](sql-gateway-user.md)；MCP 见 [sql-gateway-mcp.md](sql-gateway-mcp.md)。归 ai。
 
@@ -122,9 +124,8 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 3. **core**（应用能起、链、反代）见 [plan-gateway-core.md](plan-gateway-core.md)
 4. **access**（进门 + 额度 API）
 5. **access 金额/授权**（`plan-gateway-access-billing.md`）与 **ai Chat**（`plan-gateway-ai.md`）
-6. **orchestration**（接 HTTP，先串 Chat）
-7. MCP（ai + orchestration）
-8. 种子、README、补测试
+6. **orchestration**：先扩 core 转发合同，再串 Chat，再接 MCP 数据面（见 `plan-gateway-orchestration.md`）
+7. 种子、README、补测试
 
 ---
 

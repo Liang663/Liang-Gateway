@@ -39,7 +39,7 @@
 
 - WebFlux + Modulith。core 公开：`GatewayFilter`、`GatewayFilterChain`、`GatewayExchange`、`Upstream`、`PipelineApi`。
 - `PipelineApi.execute(ServerWebExchange)`：建 Exchange，按 `@Order` 跑所有 `GatewayFilter` Bean；若仍未写响应且 Exchange 上有 `Upstream`，则内部反代。
-- 不单独公开 ProxyApi。
+- 第一版链末隐式反代不单独公开 ProxyApi。数据面需要的 method/body/timeout、drain、捕获由 `docs/plan-gateway-orchestration.md` 扩展（公开 `ProxyApi`，覆盖本句）。
 - 反代：一个 WebClient。不转发入站 `Authorization`。请求默认放行 `Content-Type` / `Accept` / `Accept-Language`，再附加 `Upstream.extraHeaders`。响应透传去掉 hop-by-hop。`stream=false` 整包（`max-in-memory-size: 16MB`）；`stream=true` 逐帧 flush，取消则停上游。
 - 超时 yml：`gateway.proxy.connect-timeout: 5s`，`gateway.proxy.response-timeout: 120s`，`gateway.proxy.max-in-memory-size: 16MB`。
 - 错误：框架 404/405 保持原状态（`not_found` / `method_not_allowed`）；未捕获 500 `type=internal_error`；上游失败 502/504 `type=bad_gateway`。JSON：`{"error":{"message":"...","type":"..."}}`。

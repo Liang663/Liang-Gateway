@@ -3,6 +3,8 @@ package com.liang.gateway.ai.internal.application;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
+import com.liang.gateway.ai.AiBadRequestException;
+import com.liang.gateway.ai.AiNotFoundException;
 import com.liang.gateway.ai.CallLogStats;
 import com.liang.gateway.ai.ChatApi;
 import com.liang.gateway.ai.ChatUpstream;
@@ -95,7 +97,12 @@ public class DefaultChatApi implements ChatApi {
             Map<String, String> headers = new LinkedHashMap<>();
             headers.put("Authorization", "Bearer " + apikey.getSecret());
             headers.put("Content-Type", "application/json");
-            return new ChatUpstream(chatCompletionsUrl(apikey.getBaseUrl()), headers, prepared.body(), prepared.stream());
+            return new ChatUpstream(
+                    chatCompletionsUrl(apikey.getBaseUrl()),
+                    headers,
+                    prepared.body(),
+                    prepared.stream(),
+                    apikey.getCode());
         });
     }
 

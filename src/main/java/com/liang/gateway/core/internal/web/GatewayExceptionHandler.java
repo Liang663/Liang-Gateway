@@ -1,6 +1,6 @@
 package com.liang.gateway.core.internal.web;
 
-import com.liang.gateway.core.internal.application.ProxyFailureException;
+import com.liang.gateway.core.ProxyFailureException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CancellationException;
 import org.slf4j.Logger;

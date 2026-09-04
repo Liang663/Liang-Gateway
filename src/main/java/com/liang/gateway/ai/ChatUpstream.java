@@ -4,10 +4,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public record ChatUpstream(String url, Map<String, String> extraHeaders, byte[] body, boolean stream) {
+public record ChatUpstream(String url, Map<String, String> extraHeaders, byte[] body, boolean stream, String apikeyCode) {
 
     public ChatUpstream {
         Objects.requireNonNull(url, "url");
+        Objects.requireNonNull(apikeyCode, "apikeyCode");
         extraHeaders = extraHeaders == null ? Map.of() : Map.copyOf(extraHeaders);
         body = body == null ? new byte[0] : body;
     }
@@ -23,6 +24,6 @@ public record ChatUpstream(String url, Map<String, String> extraHeaders, byte[] 
             }
         });
         return "ChatUpstream[url=" + url + ", extraHeaders=" + safe + ", bodyBytes=" + body.length + ", stream="
-                + stream + "]";
+                + stream + ", apikeyCode=" + apikeyCode + "]";
     }
 }

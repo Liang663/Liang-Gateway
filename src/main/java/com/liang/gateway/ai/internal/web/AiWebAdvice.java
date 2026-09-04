@@ -1,7 +1,7 @@
 package com.liang.gateway.ai.internal.web;
 
-import com.liang.gateway.ai.internal.application.AiBadRequestException;
-import com.liang.gateway.ai.internal.application.AiNotFoundException;
+import com.liang.gateway.ai.AiBadRequestException;
+import com.liang.gateway.ai.AiNotFoundException;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
+@RestControllerAdvice(assignableTypes = {AdminLlmApikeyController.class, AdminLlmModelController.class})
 public class AiWebAdvice {
 
     @ExceptionHandler(AiNotFoundException.class)

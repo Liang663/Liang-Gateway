@@ -24,7 +24,7 @@ mcp_server 1 ──< M mcp_tool
 
 | 对象 | 职责 | 生命周期 |
 |---|---|---|
-| `mcp_server` | 一台 MCP 服务器，对应 `POST /{path}/mcp` | 管理维护 |
+| `mcp_server` | 一台 MCP 服务器，对应 `POST /mcp/{path}` | 管理维护 |
 | `mcp_tool` | 一个工具：出站 HTTP + 参数（schema 与落点都在 `args`） | 随服务器 |
 
 不建：`mcp_tool_arg`、session、网关自己的 MCP Key、按字段拆行的 mapping 表、调用日志。
@@ -38,7 +38,7 @@ CREATE TABLE `mcp_server` (
     `id`            BIGINT        NOT NULL AUTO_INCREMENT,
     `code`          VARCHAR(64)   NOT NULL COMMENT '逻辑主键，仅内部与 FK 用',
     `name`          VARCHAR(128)  NOT NULL COMMENT 'serverInfo.name，给人看',
-    `path`          VARCHAR(64)   NOT NULL COMMENT 'URL 路径段，POST /{path}/mcp',
+    `path`          VARCHAR(64)   NOT NULL COMMENT 'URL 路径段，POST /mcp/{path}',
     `description`   VARCHAR(512)  NULL COMMENT 'discover 的 instructions，可空',
     `version`       VARCHAR(32)   NOT NULL COMMENT 'serverInfo.version，如 1.0.0',
     `enabled`       TINYINT       NOT NULL DEFAULT 1,
@@ -79,7 +79,7 @@ CREATE TABLE `mcp_tool` (
 |---|---|---|
 | `code` | 内部逻辑主键 | 全局唯一；不进 URL |
 | `name` | discover / 响应里的 `serverInfo.name` | 给人看；允许中文；不必全局唯一 |
-| `path` | `POST /{path}/mcp` | 全局唯一；改 path 即改地址 |
+| `path` | `POST /mcp/{path}` | 全局唯一；改 path 即改地址 |
 | `version` | `serverInfo.version` | 非空 |
 | `description` | discover 的 `instructions` | 可空则响应不带该字段 |
 | `enabled=0` | 该入口不服务 | discover/list/call 都视为不存在 |

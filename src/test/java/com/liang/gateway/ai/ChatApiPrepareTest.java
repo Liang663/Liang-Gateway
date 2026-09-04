@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import com.liang.gateway.ai.internal.application.AiNotFoundException;
+import com.liang.gateway.ai.AiNotFoundException;
 import com.liang.gateway.ai.internal.application.ApikeySnapshot;
 import com.liang.gateway.ai.internal.application.LlmApikeyAdminService;
 import com.liang.gateway.ai.internal.application.LlmModelAdminService;
@@ -56,8 +56,10 @@ class ChatApiPrepareTest {
                     assertThat(body.path("messages").isArray()).isTrue();
                     assertThat(body.path("stream").asBoolean()).isTrue();
                     assertThat(body.path("stream_options").path("include_usage").asBoolean()).isTrue();
+                    assertThat(upstream.apikeyCode()).isEqualTo(catalog.apikeyCode());
                     assertThat(upstream.toString()).doesNotContain("sk-test-secret-value");
                     assertThat(upstream.toString()).contains("Bearer ***");
+                    assertThat(upstream.toString()).contains(catalog.apikeyCode());
                 })
                 .verifyComplete();
     }

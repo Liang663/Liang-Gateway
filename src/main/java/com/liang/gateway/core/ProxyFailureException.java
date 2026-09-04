@@ -1,4 +1,4 @@
-package com.liang.gateway.core.internal.application;
+package com.liang.gateway.core;
 
 import org.springframework.http.HttpStatus;
 

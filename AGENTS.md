@@ -17,12 +17,14 @@
 | `docs/spec-gateway-mcp.md` | ai MCP 协议转换长期真相源 |
 | `docs/plan-gateway-mcp.md` | ai MCP 第一版落地计划（已完成） |
 | `docs/plan-gateway-ai.md` | ai Chat 第一版落地计划（已完成） |
+| `docs/spec-gateway-orchestration.md` | 编排数据面长期真相源 |
+| `docs/plan-gateway-orchestration.md` | 编排数据面落地计划 |
 | `docs/sql-gateway-user.md` | 用户、令牌、限额、模型、用量、出站日志表结构 |
 | `docs/sql-gateway-mcp.md` | MCP 服务器与工具表结构 |
 | `docs/research-higress-token-limit.md` | Higress Token 限制调研（已吸收，口径以 Spec / SQL 为准） |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
 
-尚未撰写：orchestration 的 spec/plan。
+尚未撰写：无（第一版领域文档已齐）。
 
 ## 2. 项目约定
 

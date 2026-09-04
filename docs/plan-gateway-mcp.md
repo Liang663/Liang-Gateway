@@ -1,6 +1,6 @@
 # Plan｜落地 ai MCP 第一版
 
-> 编码会话执行。口径以 `docs/spec-gateway-mcp.md` 为准。表以 `docs/sql-gateway-mcp.md` 为准。只实现 MCP 协议 API 与管理面，不要写数据面 `POST /{path}/mcp`，不要 import access/core，不要改 Chat。
+> 编码会话执行。口径以 `docs/spec-gateway-mcp.md` 为准。表以 `docs/sql-gateway-mcp.md` 为准。只实现 MCP 协议 API 与管理面，不要写数据面 `POST /mcp/{path}`，不要 import access/core，不要改 Chat。
 
 ## 文档信息
 
@@ -113,7 +113,7 @@ JSON-RPC 的 method 分发、`initialize` → `-32601`、版本不是 `2026-07-2
 ## 14. 当前状态
 
 - 状态：已实现（编码完成，待 orchestration POST）
-- 下一步：orchestration 的 MCP `POST /{path}/mcp` 入口
+- 下一步：orchestration 的 MCP `POST /mcp/{path}` 入口
 
 ## 15. 执行要求
 

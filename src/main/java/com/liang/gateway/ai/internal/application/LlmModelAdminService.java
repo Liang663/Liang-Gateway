@@ -1,5 +1,7 @@
 package com.liang.gateway.ai.internal.application;
 
+import com.liang.gateway.ai.AiBadRequestException;
+import com.liang.gateway.ai.AiNotFoundException;
 import com.liang.gateway.ai.internal.infrastructure.AiClock;
 import com.liang.gateway.ai.internal.infrastructure.IdentityCodes;
 import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;

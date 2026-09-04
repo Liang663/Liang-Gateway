@@ -21,7 +21,7 @@
 ### 纳入范围
 
 - 协议：仅 `2026-07-28`。无 `initialize`、无 `Mcp-Session-Id`、无 GET SSE。
-- 传输：`POST /{path}/mcp`；一次一条 JSON-RPC；第一版响应 `application/json`。
+- 传输：`POST /mcp/{path}`（`path` 为 `mcp_server.path`）；一次一条 JSON-RPC；第一版响应 `application/json`。
 - 工具目录与参数（`mcp_server` / `mcp_tool.args`）、管理 CRUD、OpenAPI 导入。
 - `tools/call` 组出站请求；包装上游结果或失败原因。
 
