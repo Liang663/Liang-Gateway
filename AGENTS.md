@@ -13,7 +13,8 @@
 | `docs/spec-gateway-access.md` | access 长期真相源 |
 | `docs/spec-gateway-ai.md` | ai Chat 长期真相源 |
 | `docs/spec-gateway-mcp.md` | ai MCP 协议转换长期真相源 |
-| `docs/spec-gateway-orchestration.md` | 编排数据面长期真相源 |
+| `docs/spec-gateway-orchestration.md` | 数据面流程域长期真相源 |
+| `docs/plan-gateway-mcp-protocol.md` | MCP JSON-RPC 下沉到 McpApi（进行中） |
 | `docs/sql-gateway-user.md` | 用户、令牌、限额、模型、用量、出站日志表结构 |
 | `docs/sql-gateway-mcp.md` | MCP 服务器与工具表结构 |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
@@ -26,7 +27,7 @@
 - 改设计必须同步改对应文档。本仓库设计会话与编码会话分开：编码会话按 Plan 写代码，不自行扩大范围。
 - 单 Maven 模块；根包 `com.liang.gateway`；Modulith 子包即领域。
 - 仅 Spring WebFlux，禁止 `spring-boot-starter-web` 与 Spring Cloud Gateway。
-- `core` / `access` / `ai` 互不依赖；只有 `orchestration` 依赖这三者，且只做编排。
+- `core` / `access` / `ai` 互不依赖；只有 `orchestration` 依赖这三者。数据面做组合与 Chat 收口（TTFT/drain/记账）；不实现配额、拷流、MCP JSON-RPC、工具映射。禁止再增加第二个编排模块。
 - Security 只解决能否进网关；额度与记账在 access，由 orchestration 在调用 ai 前后显式调用。ai 不碰 access。
 - 流式路径禁止 `collectList` / `block`。
 - 禁止提交 `config/application-local.yml`、真实 API Key、数据库密码。

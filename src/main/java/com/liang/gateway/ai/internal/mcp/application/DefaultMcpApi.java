@@ -1,6 +1,8 @@
 package com.liang.gateway.ai.internal.mcp.application;
 
 import com.liang.gateway.ai.McpApi;
+import com.liang.gateway.ai.McpApi.Outcome;
+import com.liang.gateway.ai.McpApi.Transport;
 import com.liang.gateway.ai.McpCallPrepare;
 import com.liang.gateway.ai.McpCallResult;
 import com.liang.gateway.ai.McpDiscoverResult;
@@ -9,6 +11,7 @@ import com.liang.gateway.ai.McpToolsListResult;
 import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;
 import com.liang.gateway.ai.internal.mcp.domain.McpCallWrapper;
 import com.liang.gateway.ai.internal.mcp.domain.McpFailureTexts;
+import com.liang.gateway.ai.internal.mcp.domain.McpJsonRpc;
 import com.liang.gateway.ai.internal.mcp.domain.McpProtocol;
 import com.liang.gateway.ai.internal.mcp.domain.ToolArgDefinitions;
 import com.liang.gateway.ai.internal.mcp.domain.ToolCallAssembler;
@@ -115,6 +118,81 @@ public class DefaultMcpApi implements McpApi {
     @Override
     public McpCallResult wrapCall(Integer httpStatus, String responseBody, boolean timedOut) {
         return McpCallWrapper.wrap(httpStatus, responseBody, timedOut);
+    }
+
+    @Override
+    public Mono<Outcome> handle(String serverPath, Transport transport, byte[] jsonRpcBody) {
+        return Mono.defer(() -> parseAndDispatch(serverPath, transport, jsonRpcBody));
+    }
+
+    @Override
+    public Mono<Outcome.Reply> completeCall(Object id, Integer httpStatus, String body, boolean timedOut) {
+        return Mono.just(McpJsonRpc.result(id, wrapCall(httpStatus, body, timedOut)));
+    }
+
+    private Mono<Outcome> parseAndDispatch(String serverPath, Transport transport, byte[] jsonRpcBody) {
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(jsonRpcBody == null ? new byte[0] : jsonRpcBody);
+        } catch (RuntimeException ex) {
+            return Mono.just(McpJsonRpc.parseError());
+        }
+        if (root == null || root.isArray() || !root.isObject()) {
+            return Mono.just(McpJsonRpc.invalidRequest(null));
+        }
+        Object id = McpJsonRpc.idValue(root.get("id"));
+        if (!McpJsonRpc.JSONRPC.equals(McpJsonRpc.text(root.get("jsonrpc")))) {
+            return Mono.just(McpJsonRpc.invalidRequest(id));
+        }
+        String method = McpJsonRpc.text(root.get("method"));
+        if (method == null || method.isBlank()) {
+            return Mono.just(McpJsonRpc.invalidRequest(id));
+        }
+        String headerVersion = transport == null ? null : transport.protocolVersion();
+        if (!PROTOCOL_VERSION.equals(headerVersion)) {
+            return Mono.just(McpJsonRpc.unsupportedVersion(id));
+        }
+        String methodHeader = transport == null ? null : transport.methodHeader();
+        if (!method.equals(methodHeader)) {
+            return Mono.just(McpJsonRpc.invalidRequest(id));
+        }
+        JsonNode params = root.get("params");
+        if ("tools/call".equals(method)) {
+            String paramsName = params == null ? null : McpJsonRpc.text(params.get("name"));
+            String nameHeader = transport == null ? null : transport.nameHeader();
+            if (paramsName == null || !paramsName.equals(nameHeader)) {
+                return Mono.just(McpJsonRpc.invalidRequest(id));
+            }
+        }
+        String metaVersion = McpJsonRpc.metaProtocolVersion(params);
+        return dispatchProtocol(serverPath, method, params, metaVersion, id);
+    }
+
+    private Mono<Outcome> dispatchProtocol(
+            String serverPath, String method, JsonNode params, String protocolVersion, Object id) {
+        return switch (method) {
+            case "server/discover" -> discover(serverPath, protocolVersion)
+                    .map(result -> (Outcome) McpJsonRpc.result(id, result))
+                    .onErrorResume(ex -> Mono.just(McpJsonRpc.mapApiError(ex, id)));
+            case "tools/list" -> listTools(serverPath, protocolVersion)
+                    .map(result -> (Outcome) McpJsonRpc.result(id, result))
+                    .onErrorResume(ex -> Mono.just(McpJsonRpc.mapApiError(ex, id)));
+            case "tools/call" -> prepareCall(
+                            serverPath,
+                            params == null ? null : McpJsonRpc.text(params.get("name")),
+                            McpJsonRpc.arguments(params, objectMapper),
+                            protocolVersion)
+                    .map(prepare -> toCallOutcome(id, prepare))
+                    .onErrorResume(ex -> Mono.just(McpJsonRpc.mapApiError(ex, id)));
+            default -> Mono.just(McpJsonRpc.methodNotFound(id));
+        };
+    }
+
+    private static Outcome toCallOutcome(Object id, McpCallPrepare prepare) {
+        if (prepare instanceof McpCallPrepare.Completed completed) {
+            return McpJsonRpc.result(id, completed.result());
+        }
+        return new Outcome.NeedsOutbound(id, ((McpCallPrepare.Ready) prepare).upstream());
     }
 
     private McpServerEntity requireEnabledServer(String serverPath) {

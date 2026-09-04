@@ -18,7 +18,8 @@
 | [sql-gateway-mcp.md](sql-gateway-mcp.md) | MCP 服务器与工具 | 生效 |
 | [spec-gateway-ai.md](spec-gateway-ai.md) | ai Chat Spec | 生效 |
 | [spec-gateway-mcp.md](spec-gateway-mcp.md) | MCP 协议转换 Spec | 生效 |
-| [spec-gateway-orchestration.md](spec-gateway-orchestration.md) | 编排数据面 Spec | 生效 |
+| [spec-gateway-orchestration.md](spec-gateway-orchestration.md) | 数据面流程域 Spec | 生效 |
+| [plan-gateway-mcp-protocol.md](plan-gateway-mcp-protocol.md) | MCP JSON-RPC 下沉 McpApi | 执行中 |
 
 已取消：独立 `llm` / `mcp` / `metering` / `admin` 模块文档。MCP 与 Chat 同属 `ai`。第一版领域 Plan 与 Higress 调研已吸收进 Spec / SQL。
 
@@ -87,7 +88,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 core     {}                         网关转发：链、单 URL 反代、Health
 access   {}                         调用方：Security + 金额窗口 + 模型授权 + 记账
 ai       {}                         Chat 协议 + MCP 协议转换（子包并列，不共享限额）
-orchestration    core, access, ai           编排：数据面入口，只排序调用
+orchestration    core, access, ai           数据面流程：组合 + Chat 收口；MCP JSON-RPC 在 ai
 ```
 
 三个业务域互不依赖。额度由 orchestration 调 access，不是 Security 顺便做掉，也不是 core 去调。没有独立 `llm` / `mcp` / `metering` / `admin`。
@@ -102,7 +103,7 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 **ai：** Chat：模型目录与官方单价、出站 Key、组上游、读 usage 并算分、出站日志。MCP：`mcp_server` / `mcp_tool`、2026 JSON-RPC、组工具 HTTP、失败原因包装。两套子包并列。**没有数据面 HTTP。**
 
-**orchestration：** Chat：`POST /v1/chat/completions`，额度 → 组上游 → 转发 → 日志与记账。MCP：`POST /mcp/{path}`，进门后不查额度，组工具请求 → 捕获上游 → 包装结果。不写业务算法。
+**orchestration：** 数据面流程域。Chat：额度 → 组上游 → 转发 → TTFT/drain/记账收口。MCP：HTTP 传输适配后交给 `McpApi`；需要出站时捕获再 `completeCall`。不实现配额算法、拷流、JSON-RPC、工具映射。
 
 **表：** Chat/调用方见 [sql-gateway-user.md](sql-gateway-user.md)；MCP 见 [sql-gateway-mcp.md](sql-gateway-mcp.md)。归 ai。
 
@@ -114,7 +115,7 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 
 1–6 已完成：领域划分、四模块 verify、core、access（含金额/授权）、ai Chat 与 MCP API、orchestration 数据面。
 
-剩余：种子数据、补测试。
+进行中：MCP JSON-RPC 下沉（[plan-gateway-mcp-protocol.md](plan-gateway-mcp-protocol.md)）。剩余产品项：种子数据、补测试。
 
 ---
 
@@ -140,5 +141,5 @@ orchestration    core, access, ai           编排：数据面入口，只排序
 2. 不要 Servlet 数据面、SCG、多厂商、内容审核、Spring AI。
 3. 不要提交 `config/application-local.yml`。
 4. 不要独立 `llm` / `mcp` / `metering` / `admin` / `infrastructure` 包。业务域不要互相依赖。
-5. `core` / `access` / `ai` 不得互相 import；只有 `orchestration` 依赖这三者。`orchestration` 不得实现配额、拷流、工具参数映射；JSON-RPC 信封可组，method 语义在 ai。
+5. `core` / `access` / `ai` 不得互相 import；只有 `orchestration` 依赖这三者。数据面不得实现配额、拷流、工具参数映射；MCP JSON-RPC 信封与 method 分发在 `McpApi`。禁止再增加第二个编排模块。
 6. 流式禁止 `collectList` / `block`。热路径禁止同步 JPA。

@@ -38,7 +38,7 @@ curl http://127.0.0.1:8080/health
 - `core`：过滤器链、单 URL 反代、Health
 - `access`：进门鉴权、金额窗口、模型授权、记账
 - `ai`：Chat 协议与 MCP 协议转换（子包并列）
-- `orchestration`：数据面入口，只排序调用上面三者
+- `orchestration`：数据面流程：组合公开 API，Chat 收口，MCP 只做 HTTP 适配
 
 ## 文档入口
 
