@@ -1,8 +1,8 @@
 # Liang-Gateway
 
-Java AI 网关：OpenAI 兼容 Chat 转发、HTTP→MCP（2026-07-28）、调用方鉴权与金额限额。不审内容。运行时仅 Spring WebFlux。
+Liang-Gateway 是一个面向 AI 应用的统一网关，提供 OpenAI 兼容的对话转发、HTTP API 到 MCP 工具的转换、调用方鉴权、模型访问控制、额度管理与用量记录。
 
-主要使用者：带访问令牌的调用方，以及把已有 HTTP API 暴露成 MCP 工具的 Agent。
+它可以统一接入和管理模型服务，也可以将已有 HTTP API 快速提供给 Agent 使用。
 
 ## 快速开始
 
