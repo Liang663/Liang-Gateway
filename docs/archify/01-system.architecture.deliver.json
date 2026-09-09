@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\01-system.architecture.json",
+  "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\01-system.architecture.html",
+  "specification": {
+    "sha256": "c0474a3082842c17d11e0a24f0f5701a03b04b7f7c1a2ae3dba9c83e16753859",
+    "bytes": 4553
+  },
+  "artifact": {
+    "sha256": "accf880fb1e6d25e1e8038c7b3067fadcc0f8dcdad49013cb8b0feab948c0a1f",
+    "bytes": 717514
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  },
+  "evidence": {
+    "verified": true,
+    "repository": "https://github.com/Liang663/Liang-Gateway",
+    "revision": "24d7fe23f2db89b074d02c442ff4900fe53ab3e5",
+    "references": 11
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {"title": "Liang-Gateway · 模块与运行边界", "locale": "zh-CN", "quality_profile": "showcase", "repository": {"url": "https://github.com/Liang663/Liang-Gateway", "revision": "24d7fe23f2db89b074d02c442ff4900fe53ab3e5"}},
+  "layout": {"mode": "grid", "origin": [45, 80], "cols": 5, "cellW": 190, "cellH": 82, "gapX": 105, "gapY": 140},
+  "components": [
+    {"id": "gateway-caller", "type": "external", "label": "调用方", "sublabel": "应用与管理端", "row": 1, "col": 0},
+    {"id": "gateway-entry", "type": "security", "label": "WebFlux 入口", "sublabel": "access · 身份认证", "row": 1, "col": 1, "sources": [{"path": "src/main/java/com/liang/gateway/access/internal/security/AccessSecurityConfig.java", "line": 17}]},
+    {"id": "gateway-orchestrator", "type": "backend", "label": "orchestration", "sublabel": "Chat / MCP 流程组合", "row": 1, "col": 2, "sources": [{"path": "src/main/java/com/liang/gateway/orchestration/package-info.java", "line": 1}, {"path": "src/main/java/com/liang/gateway/orchestration/internal/application/ChatCompletionService.java", "line": 51}]},
+    {"id": "gateway-proxy", "type": "backend", "label": "core", "sublabel": "HTTP 代理 / SSE 组帧", "row": 1, "col": 3, "sources": [{"path": "src/main/java/com/liang/gateway/core/internal/infrastructure/WebClientProxy.java", "line": 64}]},
+    {"id": "gateway-upstreams", "type": "external", "label": "HTTP 上游", "sublabel": "模型服务 / 业务接口", "row": 1, "col": 4},
+    {"id": "gateway-access", "type": "backend", "label": "access", "sublabel": "权限 / 额度 / 用量", "row": 0, "col": 2, "sources": [{"path": "src/main/java/com/liang/gateway/access/internal/application/DefaultAccessApi.java", "line": 60}]},
+    {"id": "gateway-redis", "type": "database", "label": "Redis", "sublabel": "QPM / 5h / week", "row": 0, "col": 3, "sources": [{"path": "src/main/java/com/liang/gateway/access/internal/infrastructure/redis/RedisQuotaWindowStore.java", "line": 30}]},
+    {"id": "gateway-access-sql", "type": "database", "label": "MySQL · access", "sublabel": "用户 / 令牌 / 用量表", "row": 0, "col": 1, "sources": [{"path": "src/main/resources/db/migration/V1__user_apikey_usage.sql"}]},
+    {"id": "gateway-ai", "type": "backend", "label": "ai", "sublabel": "模型适配 / MCP 协议", "row": 2, "col": 2, "sources": [{"path": "src/main/java/com/liang/gateway/ai/internal/mcp/application/DefaultMcpApi.java", "line": 124}, {"path": "src/main/java/com/liang/gateway/ai/internal/application/DefaultChatApi.java", "line": 77}]},
+    {"id": "gateway-ai-sql", "type": "database", "label": "MySQL · ai", "sublabel": "模型 / 工具 / 日志", "row": 2, "col": 3, "sources": [{"path": "src/main/resources/db/migration/V2__billing_and_model.sql"}, {"path": "src/main/resources/db/migration/V3__mcp_server_tool.sql"}]}
+  ],
+  "connections": [
+    {"id": "caller-http", "from": "gateway-caller", "to": "gateway-entry", "label": "HTTP", "variant": "emphasis"},
+    {"id": "entry-dispatch", "from": "gateway-entry", "to": "gateway-orchestrator", "label": "数据面", "variant": "emphasis"},
+    {"id": "orchestrate-proxy", "from": "gateway-orchestrator", "to": "gateway-proxy", "label": "ProxyApi", "variant": "emphasis"},
+    {"id": "proxy-http", "from": "gateway-proxy", "to": "gateway-upstreams", "label": "WebClient", "variant": "emphasis"},
+    {"id": "orchestrate-access", "from": "gateway-orchestrator", "to": "gateway-access", "label": "检查 / 记账"},
+    {"id": "access-redis", "from": "gateway-access", "to": "gateway-redis", "label": "Lua"},
+    {"id": "access-sql", "from": "gateway-access", "to": "gateway-access-sql", "label": "JPA"},
+    {"id": "orchestrate-ai", "from": "gateway-orchestrator", "to": "gateway-ai", "label": "ChatApi / McpApi", "labelAt": [705, 376]},
+    {"id": "ai-sql", "from": "gateway-ai", "to": "gateway-ai-sql", "label": "JPA"}
+  ],
+  "cards": [
+    {"dot": "cyan", "title": "模块化单体", "items": ["单 Maven 应用；core / access / ai 互不依赖。", "管理 API 由各领域直接提供；/health 允许匿名。"]},
+    {"dot": "emerald", "title": "存储与安全", "items": ["两组 MySQL 节点表示同一数据库的领域表。", "入站 Authorization 不默认透传；JPA 隔离至 boundedElastic。"]},
+    {"dot": "amber", "title": "边界", "items": ["Chat 显式检查额度并结算；MCP 出站不走 Chat 记账。", "图示为代码结构与调用关系，未声明生产部署容量。"]}
+  ]
+}

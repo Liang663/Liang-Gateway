@@ -1,0 +1,212 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Chat · 准入、出站与结算流程",
+    "locale": "zh-CN",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "chat-main",
+      "label": "Chat 主流程"
+    },
+    {
+      "id": "chat-stop",
+      "label": "失败与终止",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "chat-input",
+    "chat-permission",
+    "chat-quota",
+    "chat-prepare",
+    "chat-forward",
+    "chat-settle"
+  ],
+  "nodes": [
+    {
+      "id": "chat-input",
+      "lane": "chat-main",
+      "col": 0,
+      "type": "external",
+      "label": "请求进入",
+      "sublabel": "解析 model",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-permission",
+      "lane": "chat-main",
+      "col": 1,
+      "type": "security",
+      "label": "模型授权",
+      "sublabel": "AccessApi",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-quota",
+      "lane": "chat-main",
+      "col": 2,
+      "type": "security",
+      "label": "额度检查",
+      "sublabel": "周期金额 → QPM",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-prepare",
+      "lane": "chat-main",
+      "col": 3,
+      "type": "backend",
+      "label": "准备上游",
+      "sublabel": "模型 / 凭据 / 请求体",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-forward",
+      "lane": "chat-main",
+      "col": 4,
+      "type": "backend",
+      "label": "调用与转发",
+      "sublabel": "JSON 或 SSE",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-settle",
+      "lane": "chat-main",
+      "col": 5,
+      "type": "database",
+      "label": "定价与记账",
+      "sublabel": "usage / 出站日志",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-forbidden",
+      "lane": "chat-stop",
+      "col": 1,
+      "type": "security",
+      "label": "拒绝模型访问",
+      "sublabel": "403",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-quota-fail",
+      "lane": "chat-stop",
+      "col": 2,
+      "type": "security",
+      "label": "拒绝进入上游",
+      "sublabel": "429 / Redis 异常 503",
+      "width": 143,
+      "yOffset": 70
+    },
+    {
+      "id": "chat-upstream-fail",
+      "lane": "chat-stop",
+      "col": 4,
+      "type": "external",
+      "label": "上游失败处理",
+      "sublabel": "错误日志 / 异常映射",
+      "width": 143,
+      "yOffset": 70
+    }
+  ],
+  "edges": [
+    {
+      "id": "input-permission",
+      "from": "chat-input",
+      "to": "chat-permission",
+      "label": "身份已认证",
+      "role": "main"
+    },
+    {
+      "id": "permission-quota",
+      "from": "chat-permission",
+      "to": "chat-quota",
+      "label": "授权通过",
+      "role": "main"
+    },
+    {
+      "id": "quota-prepare",
+      "from": "chat-quota",
+      "to": "chat-prepare",
+      "label": "额度通过",
+      "role": "main"
+    },
+    {
+      "id": "prepare-forward",
+      "from": "chat-prepare",
+      "to": "chat-forward",
+      "label": "ProxyApi",
+      "role": "main"
+    },
+    {
+      "id": "forward-settle",
+      "from": "chat-forward",
+      "to": "chat-settle",
+      "label": "有效 usage",
+      "role": "main"
+    },
+    {
+      "id": "permission-stop",
+      "from": "chat-permission",
+      "to": "chat-forbidden",
+      "label": "未授权",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "quota-stop",
+      "from": "chat-quota",
+      "to": "chat-quota-fail",
+      "label": "超额或不可用",
+      "role": "error",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        527.9,
+        350
+      ]
+    },
+    {
+      "id": "forward-stop",
+      "from": "chat-forward",
+      "to": "chat-upstream-fail",
+      "label": "无可结算用量的失败",
+      "role": "error",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "接入与转发",
+      "items": [
+        "入口为 /v1/chat/completions；模型列表按令牌授权过滤。",
+        "SSE 强制 include_usage；非流式先解析完整 JSON。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "结算边界",
+      "items": [
+        "金额检查 used > limit；调用前未预占预算。",
+        "缺失 usage 不伪造费用；流式异常已有 usage 时仍尝试结算。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "取消语义",
+      "items": [
+        "客户端断连后继续 drain，后续生命周期见独立状态图。",
+        "Redis 累加与 MySQL 持久化分步执行。"
+      ]
+    }
+  ]
+}

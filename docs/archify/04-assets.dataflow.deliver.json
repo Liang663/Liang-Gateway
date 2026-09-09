@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\04-assets.dataflow.json",
+  "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\04-assets.dataflow.html",
+  "specification": {
+    "sha256": "5426e22e104e18ec2f4b86ef88aaded552185cb2042ae60458a91b23c71c28be",
+    "bytes": 3127
+  },
+  "artifact": {
+    "sha256": "0bdcf07c7a99b730b2daf683d5d9aeb6ed5cdd42bb6f980a231a9d86aaabe9ca",
+    "bytes": 714230
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

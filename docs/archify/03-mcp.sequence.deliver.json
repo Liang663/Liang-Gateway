@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\03-mcp.sequence.json",
+  "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\03-mcp.sequence.html",
+  "specification": {
+    "sha256": "635af1973b4f6579312fdd31e9b67802d5745b04de56e251ba3083b2e0b3eadb",
+    "bytes": 3754
+  },
+  "artifact": {
+    "sha256": "00660a1029a4a6392f0eb4125dff44c8856520bd3c3c02dcdc9db94796324157",
+    "bytes": 712089
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

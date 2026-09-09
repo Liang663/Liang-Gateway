@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "lifecycle",
+  "input": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\05-sse.lifecycle.json",
+  "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\05-sse.lifecycle.html",
+  "specification": {
+    "sha256": "672cb48090e043582d99c82292197b47329691ea52ca7e6ba569561570e46e7a",
+    "bytes": 3110
+  },
+  "artifact": {
+    "sha256": "403ea155cc33434da336f86cf175a95b9d4f306690c1511f8b2370abd67e6dd8",
+    "bytes": 707667
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "analysis_root": "D:/java/ideaProjects/Liang-Gateway",
+  "revision": "24d7fe23f2db89b074d02c442ff4900fe53ab3e5",
+  "existing_docs_read": false,
+  "reviewer": "Codex image-capable visual review",
+  "scope": "Diagram artifact and browser display only; no Maven tests or load tests executed.",
+  "diagrams": [
+    {
+      "diagram_type": "architecture",
+      "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\01-system.architecture.html",
+      "specification": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\01-system.architecture.json",
+      "specification_sha256": "c0474a3082842c17d11e0a24f0f5701a03b04b7f7c1a2ae3dba9c83e16753859",
+      "specification_bytes": 4553,
+      "artifact_sha256": "accf880fb1e6d25e1e8038c7b3067fadcc0f8dcdad49013cb8b0feab948c0a1f",
+      "artifact_bytes": 717514,
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "browser_receipt": "01-system.architecture.visual-check.json",
+      "browser_artifact_matches_delivery": true,
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_screenshots": [
+        "01-system.architecture.visual-check.1440x900.light.png",
+        "01-system.architecture.visual-check.2048x1320.dark.png"
+      ],
+      "review_observations": "Default READ/Still; light and dark labels legible; relationships identifiable; nodes/cards contained; desktop first-screen composition reviewed."
+    },
+    {
+      "diagram_type": "workflow",
+      "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\02-chat.workflow.html",
+      "specification": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\02-chat.workflow.json",
+      "specification_sha256": "71d6255cf0f14f9c206fcbb48059e6bdbda950119eac870977e993f958eaf754",
+      "specification_bytes": 4719,
+      "artifact_sha256": "bbd1dcd8176b9453023b18eb332469e2c223c10e3988828cce5aebb56751f2b9",
+      "artifact_bytes": 714137,
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "browser_receipt": "02-chat.workflow.visual-check.json",
+      "browser_artifact_matches_delivery": true,
+      "visual_review": "passed",
+      "correction_rounds": 1,
+      "reviewed_screenshots": [
+        "02-chat.workflow.visual-check.1440x900.light.png",
+        "02-chat.workflow.visual-check.2048x1320.dark.png"
+      ],
+      "review_observations": "Default READ/Still; light and dark labels legible; relationships identifiable; nodes/cards contained; desktop first-screen composition reviewed."
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\03-mcp.sequence.html",
+      "specification": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\03-mcp.sequence.json",
+      "specification_sha256": "635af1973b4f6579312fdd31e9b67802d5745b04de56e251ba3083b2e0b3eadb",
+      "specification_bytes": 3754,
+      "artifact_sha256": "00660a1029a4a6392f0eb4125dff44c8856520bd3c3c02dcdc9db94796324157",
+      "artifact_bytes": 712089,
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "browser_receipt": "03-mcp.sequence.visual-check.json",
+      "browser_artifact_matches_delivery": true,
+      "visual_review": "passed",
+      "correction_rounds": 1,
+      "reviewed_screenshots": [
+        "03-mcp.sequence.visual-check.1440x900.light.png",
+        "03-mcp.sequence.visual-check.2048x1320.dark.png"
+      ],
+      "review_observations": "Default READ/Still; light and dark labels legible; relationships identifiable; nodes/cards contained; desktop first-screen composition reviewed."
+    },
+    {
+      "diagram_type": "dataflow",
+      "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\04-assets.dataflow.html",
+      "specification": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\04-assets.dataflow.json",
+      "specification_sha256": "5426e22e104e18ec2f4b86ef88aaded552185cb2042ae60458a91b23c71c28be",
+      "specification_bytes": 3127,
+      "artifact_sha256": "0bdcf07c7a99b730b2daf683d5d9aeb6ed5cdd42bb6f980a231a9d86aaabe9ca",
+      "artifact_bytes": 714230,
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "browser_receipt": "04-assets.dataflow.visual-check.json",
+      "browser_artifact_matches_delivery": true,
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_screenshots": [
+        "04-assets.dataflow.visual-check.1440x900.light.png",
+        "04-assets.dataflow.visual-check.2048x1320.dark.png"
+      ],
+      "review_observations": "Default READ/Still; light and dark labels legible; relationships identifiable; nodes/cards contained; desktop first-screen composition reviewed."
+    },
+    {
+      "diagram_type": "lifecycle",
+      "output": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\05-sse.lifecycle.html",
+      "specification": "D:\\java\\ideaProjects\\Liang-Gateway\\docs\\archify\\05-sse.lifecycle.json",
+      "specification_sha256": "672cb48090e043582d99c82292197b47329691ea52ca7e6ba569561570e46e7a",
+      "specification_bytes": 3110,
+      "artifact_sha256": "403ea155cc33434da336f86cf175a95b9d4f306690c1511f8b2370abd67e6dd8",
+      "artifact_bytes": 707667,
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "browser_receipt": "05-sse.lifecycle.visual-check.json",
+      "browser_artifact_matches_delivery": true,
+      "visual_review": "passed",
+      "correction_rounds": 1,
+      "reviewed_screenshots": [
+        "05-sse.lifecycle.visual-check.1440x900.light.png",
+        "05-sse.lifecycle.visual-check.2048x1320.dark.png"
+      ],
+      "review_observations": "Default READ/Still; light and dark labels legible; relationships identifiable; nodes/cards contained; desktop first-screen composition reviewed."
+    }
+  ]
+}

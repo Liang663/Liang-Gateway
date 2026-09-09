@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "MCP · 工具调用时序",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "mcp-caller",
+      "type": "external",
+      "label": "MCP 客户端",
+      "sublabel": "已通过身份认证"
+    },
+    {
+      "id": "mcp-flow",
+      "type": "backend",
+      "label": "orchestration",
+      "sublabel": "传输与出站组合"
+    },
+    {
+      "id": "mcp-domain",
+      "type": "backend",
+      "label": "ai / McpApi",
+      "sublabel": "协议与工具映射"
+    },
+    {
+      "id": "mcp-store",
+      "type": "database",
+      "label": "MySQL",
+      "sublabel": "服务与工具配置"
+    },
+    {
+      "id": "mcp-proxy",
+      "type": "backend",
+      "label": "core / ProxyApi",
+      "sublabel": "通用 HTTP 出站"
+    },
+    {
+      "id": "mcp-business",
+      "type": "external",
+      "label": "业务 HTTP",
+      "sublabel": "原有业务服务"
+    }
+  ],
+  "messages": [
+    {
+      "id": "mcp-call-in",
+      "from": "mcp-caller",
+      "to": "mcp-flow",
+      "y": 160,
+      "label": "tools/call",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mcp-handle",
+      "from": "mcp-flow",
+      "to": "mcp-domain",
+      "y": 183,
+      "label": "handle",
+      "variant": "security",
+      "note": "传输校验通过；解析 JSON-RPC 与版本、方法、工具名"
+    },
+    {
+      "id": "mcp-query",
+      "from": "mcp-domain",
+      "to": "mcp-store",
+      "y": 211,
+      "label": "查询启用配置"
+    },
+    {
+      "id": "mcp-config",
+      "from": "mcp-store",
+      "to": "mcp-domain",
+      "y": 239,
+      "label": "工具定义",
+      "variant": "return"
+    },
+    {
+      "id": "mcp-ready",
+      "from": "mcp-domain",
+      "to": "mcp-flow",
+      "y": 267,
+      "label": "NeedsOutbound",
+      "variant": "return",
+      "note": "参数校验与 URL / Header / Body 组装已完成"
+    },
+    {
+      "id": "mcp-exchange",
+      "from": "mcp-flow",
+      "to": "mcp-proxy",
+      "y": 295,
+      "label": "exchange(upstream)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mcp-http-call",
+      "from": "mcp-proxy",
+      "to": "mcp-business",
+      "y": 323,
+      "label": "HTTP 请求",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mcp-http-return",
+      "from": "mcp-business",
+      "to": "mcp-proxy",
+      "y": 351,
+      "label": "状态码与正文",
+      "variant": "return"
+    },
+    {
+      "id": "mcp-proxy-return",
+      "from": "mcp-proxy",
+      "to": "mcp-flow",
+      "y": 379,
+      "label": "ProxyResponse",
+      "variant": "return"
+    },
+    {
+      "id": "mcp-wrap",
+      "from": "mcp-flow",
+      "to": "mcp-domain",
+      "y": 407,
+      "label": "completeCall",
+      "note": "业务错误与超时转换为工具结果"
+    },
+    {
+      "id": "mcp-reply",
+      "from": "mcp-domain",
+      "to": "mcp-flow",
+      "y": 435,
+      "label": "Reply",
+      "variant": "return"
+    },
+    {
+      "id": "mcp-result",
+      "from": "mcp-flow",
+      "to": "mcp-caller",
+      "y": 463,
+      "label": "JSON-RPC 结果",
+      "variant": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "请求级协议",
+      "items": [
+        "POST /mcp/{path}；固定版本 2026-07-28。",
+        "server/discover 与 tools/list 可直接返回，无需出站。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "结果与边界",
+      "items": [
+        "工具执行失败使用 isError；协议错误走 JSON-RPC error。",
+        "无 initialize 会话；完整规范兼容性需另行验证。"
+      ]
+    }
+  ]
+}

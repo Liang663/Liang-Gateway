@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "SSE · 连接、断连与结算生命周期",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      680
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常推进"
+    },
+    {
+      "id": "stream-events",
+      "label": "断连与异常"
+    },
+    {
+      "id": "terminal",
+      "label": "失败终态"
+    }
+  ],
+  "states": [
+    {
+      "id": "stream-ready",
+      "type": "start",
+      "label": "准入完成",
+      "lane": "main",
+      "col": 0
+    },
+    {
+      "id": "stream-open",
+      "type": "active",
+      "label": "连接上游",
+      "lane": "main",
+      "col": 1
+    },
+    {
+      "id": "stream-forward",
+      "type": "active",
+      "label": "流式转发",
+      "lane": "main",
+      "col": 2
+    },
+    {
+      "id": "stream-settle",
+      "type": "decision",
+      "label": "结算处理",
+      "lane": "main",
+      "col": 3
+    },
+    {
+      "id": "stream-done",
+      "type": "success",
+      "label": "记账完成",
+      "lane": "main",
+      "col": 4
+    },
+    {
+      "id": "stream-drain",
+      "type": "active",
+      "label": "继续消费上游",
+      "lane": "stream-events",
+      "col": 0
+    },
+    {
+      "id": "stream-missing",
+      "type": "failure",
+      "label": "记录用量缺失",
+      "lane": "terminal",
+      "col": 1
+    },
+    {
+      "id": "stream-failed",
+      "type": "failure",
+      "label": "结算失败",
+      "lane": "terminal",
+      "col": 2
+    }
+  ],
+  "transitions": [
+    {
+      "id": "stream-disconnect",
+      "from": "stream-forward",
+      "to": "stream-drain",
+      "label": "客户端断连",
+      "labelAt": [
+        402,
+        202
+      ]
+    },
+    {
+      "id": "drain-finish",
+      "from": "stream-drain",
+      "to": "stream-settle",
+      "label": "上游结束"
+    },
+    {
+      "id": "usage-missing",
+      "from": "stream-settle",
+      "to": "stream-missing",
+      "label": "缺少 usage",
+      "variant": "security",
+      "labelAt": [
+        556,
+        202
+      ]
+    },
+    {
+      "id": "settle-failed",
+      "from": "stream-settle",
+      "to": "stream-failed",
+      "label": "记账异常",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "主轨阶段",
+      "items": [
+        "主轨按连接、转发、结算顺序推进，阶段箭头省略重复文字。",
+        "收到非空内容时记录 TTFT；有效 usage 以最后一份为准。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "取消与消费",
+      "items": [
+        "写客户端与消费上游共享帧流；断连后 drain 继续执行。",
+        "取消隔离保持结算链；图中状态为代码行为的分析抽象。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常边界",
+      "items": [
+        "观察到帧却缺失 usage 时记录失败，不计算虚构费用。",
+        "上游异常已有 usage 仍尝试结算；无 usage 则记录调用失败。"
+      ]
+    }
+  ]
+}

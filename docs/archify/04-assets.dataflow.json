@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {"title": "Liang-Gateway · 配置与用量数据流", "locale": "zh-CN", "quality_profile": "showcase", "viewBox": [1080, 560]},
+  "stages": [{"label": "来源"}, {"label": "解析"}, {"label": "领域转换"}, {"label": "累计与发布"}, {"label": "消费与留痕"}],
+  "nodes": [
+    {"id": "usage-source", "type": "external", "label": "模型响应", "sublabel": "JSON / SSE", "stage": 0, "row": 0},
+    {"id": "usage-extract", "type": "backend", "label": "用量解析", "sublabel": "TokenCounts", "stage": 1, "row": 0},
+    {"id": "usage-price", "type": "backend", "label": "模型定价", "sublabel": "输入与输出价格", "stage": 2, "row": 0},
+    {"id": "usage-windows", "type": "database", "label": "Redis 窗口", "sublabel": "5h / week", "stage": 3, "row": 0},
+    {"id": "usage-ledger", "type": "database", "label": "MySQL 明细", "sublabel": "快照 / 用量 / 日志", "stage": 4, "row": 0},
+    {"id": "openapi-source", "type": "external", "label": "OpenAPI", "sublabel": "JSON 与选定路径", "stage": 0, "row": 2},
+    {"id": "openapi-import", "type": "backend", "label": "接口导入", "sublabel": "本地引用与参数", "stage": 1, "row": 2},
+    {"id": "openapi-tools", "type": "database", "label": "工具配置", "sublabel": "MySQL 工具表", "stage": 2, "row": 2},
+    {"id": "openapi-schema", "type": "backend", "label": "Schema 生成", "sublabel": "name / inputSchema", "stage": 3, "row": 2},
+    {"id": "openapi-agent", "type": "external", "label": "Agent", "sublabel": "发现与选择工具", "stage": 4, "row": 2}
+  ],
+  "flows": [
+    {"id": "usage-raw", "from": "usage-source", "to": "usage-extract", "label": "usage", "variant": "emphasis"},
+    {"id": "usage-counts", "from": "usage-extract", "to": "usage-price", "label": "Token 数", "variant": "emphasis"},
+    {"id": "usage-money", "from": "usage-price", "to": "usage-windows", "label": "金额（分）", "variant": "emphasis"},
+    {"id": "usage-persist", "from": "usage-windows", "to": "usage-ledger", "label": "回写与记账", "variant": "emphasis"},
+    {"id": "openapi-json", "from": "openapi-source", "to": "openapi-import", "label": "接口定义"},
+    {"id": "openapi-drafts", "from": "openapi-import", "to": "openapi-tools", "label": "工具草稿"},
+    {"id": "openapi-definitions", "from": "openapi-tools", "to": "openapi-schema", "label": "参数定义"},
+    {"id": "openapi-catalog", "from": "openapi-schema", "to": "openapi-agent", "label": "tools/list"}
+  ],
+  "cards": [
+    {"dot": "emerald", "title": "模型用量", "items": ["费用由模型配置价格计算；TTFT 与调用结果进入出站日志。", "Redis 与 MySQL 分步写入，图中未声明跨存储事务。"]},
+    {"dot": "cyan", "title": "工具资产", "items": ["支持 GET / POST / PUT / DELETE 与本地 $ref。", "工具定义保留 path / query / header / body 映射。"]},
+    {"dot": "amber", "title": "读取入口", "items": ["/v1/usage 提供额度、记录与统计查询。", "模型、令牌和工具配置分别由领域管理 API 维护。"]}
+  ]
+}
