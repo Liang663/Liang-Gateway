@@ -9,8 +9,8 @@ import com.liang.gateway.access.internal.application.UsageLimitInput;
 import com.liang.gateway.access.internal.application.UserAdminService;
 import com.liang.gateway.ai.internal.application.LlmApikeyAdminService;
 import com.liang.gateway.ai.internal.application.LlmModelAdminService;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogEntity;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogEntity;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogRepository;
 import com.liang.gateway.orchestration.ChatTestSupport.Catalog;
 import java.io.IOException;
 import java.util.List;
@@ -120,7 +120,8 @@ class ChatCompletionsHttpTest {
 
         assertThat(usageCount(catalog.tokenCode())).isEqualTo(1L);
         assertThat(usageAmount(catalog.tokenCode())).isEqualTo(200L);
-        List<LlmCallLogEntity> logs = callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(catalog.apikeyCode());
+        List<LlmCallLogEntity> logs =
+                callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(catalog.apikeyCode()).collectList().block();
         assertThat(logs).isNotEmpty();
         assertThat(logs.getFirst().isSuccess()).isTrue();
     }
@@ -148,7 +149,8 @@ class ChatCompletionsHttpTest {
                 .isEqualTo("bad_gateway");
 
         assertThat(usageCount(catalog.tokenCode())).isZero();
-        List<LlmCallLogEntity> logs = callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(catalog.apikeyCode());
+        List<LlmCallLogEntity> logs =
+                callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(catalog.apikeyCode()).collectList().block();
         assertThat(logs).anyMatch(log -> !log.isSuccess() && "missing usage".equals(log.getMessage()));
     }
 

@@ -14,7 +14,8 @@
 | `docs/spec-gateway-ai.md` | ai Chat 长期真相源 |
 | `docs/spec-gateway-mcp.md` | ai MCP 协议转换长期真相源 |
 | `docs/spec-gateway-orchestration.md` | 数据面流程域长期真相源 |
-| `docs/plan-gateway-mcp-protocol.md` | MCP JSON-RPC 下沉到 McpApi（进行中） |
+| `docs/plan-gateway-mcp-protocol.md` | MCP JSON-RPC 下沉到 McpApi（已实现，可删） |
+| `docs/plan-gateway-r2dbc.md` | 运行时 MySQL 从 JPA 换成 R2DBC（进行中） |
 | `docs/sql-gateway-user.md` | 用户、令牌、限额、模型、用量、出站日志表结构 |
 | `docs/sql-gateway-mcp.md` | MCP 服务器与工具表结构 |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
@@ -29,7 +30,7 @@
 - 仅 Spring WebFlux，禁止 `spring-boot-starter-web` 与 Spring Cloud Gateway。
 - `core` / `access` / `ai` 互不依赖；只有 `orchestration` 依赖这三者。数据面做组合与 Chat 收口（TTFT/drain/记账）；不实现配额、拷流、MCP JSON-RPC、工具映射。禁止再增加第二个编排模块。
 - Security 只解决能否进网关；额度与记账在 access，由 orchestration 在调用 ai 前后显式调用。ai 不碰 access。
-- 流式路径禁止 `collectList` / `block`。
+- 流式路径禁止 `collectList` / `block`。运行时 MySQL 走 R2DBC，禁止在事件循环上跑 JDBC/JPA；Flyway 只在启动期用 JDBC。
 - 禁止提交 `config/application-local.yml`、真实 API Key、数据库密码。
 - 不要 Lombok。不要独立 `llm` / `mcp` / `metering` / `admin` / `infrastructure` 模块。
 - 不要做内容审核/脱敏、注册中心、负载均衡（第一版）。

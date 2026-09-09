@@ -4,7 +4,12 @@
 spring:
   datasource:
     # Compose MySQL: 127.0.0.1:3307, user root, password liang, database liang_gateway
+    # JDBC 只给 Flyway 和测试断言；运行时走下面的 r2dbc。
     url: jdbc:mysql://127.0.0.1:3307/liang_gateway?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: liang
+  r2dbc:
+    url: r2dbc:mysql://127.0.0.1:3307/liang_gateway?connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
     username: root
     password: liang
   data:

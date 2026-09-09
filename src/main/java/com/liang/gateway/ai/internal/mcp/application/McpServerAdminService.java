@@ -1,14 +1,14 @@
 package com.liang.gateway.ai.internal.mcp.application;
 
 import com.liang.gateway.ai.internal.infrastructure.AiClock;
-import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;
 import com.liang.gateway.ai.internal.mcp.infrastructure.McpIdentityCodes;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpServerEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpServerRepository;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpServerEntity;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpServerRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolRepository;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -16,88 +16,92 @@ public class McpServerAdminService {
 
     private static final Pattern SERVER_PATH = Pattern.compile("^[A-Za-z0-9_-]+$");
 
-    private final AiJpaExecutor jpaExecutor;
     private final McpServerRepository serverRepository;
     private final McpToolRepository toolRepository;
     private final AiClock aiClock;
+    private final TransactionalOperator transactionalOperator;
 
     public McpServerAdminService(
-            AiJpaExecutor jpaExecutor,
             McpServerRepository serverRepository,
             McpToolRepository toolRepository,
-            AiClock aiClock) {
-        this.jpaExecutor = jpaExecutor;
+            AiClock aiClock,
+            TransactionalOperator transactionalOperator) {
         this.serverRepository = serverRepository;
         this.toolRepository = toolRepository;
         this.aiClock = aiClock;
+        this.transactionalOperator = transactionalOperator;
     }
 
     public Mono<McpServerSnapshot> create(String name, String path, String description, String version, boolean enabled) {
-        return jpaExecutor.call(() -> {
+        return Mono.defer(() -> {
             String nextName = requireText(name, "name", 128);
             String nextPath = requirePath(path);
             String nextVersion = requireText(version, "version", 32);
             String nextDescription = optionalText(description, "description", 512);
-            serverRepository.findByPath(nextPath).ifPresent(existing -> {
-                throw new McpBadRequestException("path already exists");
-            });
-            McpServerEntity saved = serverRepository.save(McpServerEntity.create(
-                    McpIdentityCodes.serverCode(),
-                    nextName,
-                    nextPath,
-                    nextDescription,
-                    nextVersion,
-                    enabled,
-                    aiClock.nowShanghai()));
-            return toSnapshot(saved);
+            return serverRepository
+                    .findByPath(nextPath)
+                    .flatMap(existing -> Mono.error(new McpBadRequestException("path already exists")))
+                    .switchIfEmpty(Mono.defer(() -> serverRepository.save(McpServerEntity.create(
+                            McpIdentityCodes.serverCode(),
+                            nextName,
+                            nextPath,
+                            nextDescription,
+                            nextVersion,
+                            enabled,
+                            aiClock.nowShanghai()))))
+                    .cast(McpServerEntity.class)
+                    .map(McpServerAdminService::toSnapshot);
         });
     }
 
     public Mono<List<McpServerSnapshot>> list() {
-        return jpaExecutor.call(() -> serverRepository.findAllByOrderByCreateTimeDesc().stream()
-                .map(McpServerAdminService::toSnapshot)
-                .toList());
+        return serverRepository.findAllByOrderByCreateTimeDesc().map(McpServerAdminService::toSnapshot).collectList();
     }
 
     public Mono<McpServerSnapshot> get(String code) {
-        return jpaExecutor.call(() -> toSnapshot(requireServer(code)));
+        return requireServer(code).map(McpServerAdminService::toSnapshot);
     }
 
     public Mono<McpServerSnapshot> update(
             String code, String name, String path, String description, String version, Boolean enabled) {
-        return jpaExecutor.call(() -> {
-            McpServerEntity entity = requireServer(code);
+        return requireServer(code).flatMap(entity -> {
             String nextName = name == null ? entity.getName() : requireText(name, "name", 128);
             String nextPath = path == null ? entity.getPath() : requirePath(path);
             String nextVersion = version == null ? entity.getVersion() : requireText(version, "version", 32);
             String nextDescription =
                     description == null ? entity.getDescription() : optionalText(description, "description", 512);
             boolean nextEnabled = enabled == null ? entity.isEnabled() : enabled;
-            serverRepository.findByPath(nextPath).ifPresent(existing -> {
-                if (!existing.getCode().equals(code)) {
-                    throw new McpBadRequestException("path already exists");
-                }
-            });
-            entity.update(nextName, nextPath, nextDescription, nextVersion, nextEnabled, aiClock.nowShanghai());
-            return toSnapshot(serverRepository.save(entity));
+            return serverRepository
+                    .findByPath(nextPath)
+                    .flatMap(existing -> {
+                        if (!existing.getCode().equals(code)) {
+                            return Mono.error(new McpBadRequestException("path already exists"));
+                        }
+                        return Mono.just(entity);
+                    })
+                    .switchIfEmpty(Mono.just(entity))
+                    .flatMap(current -> {
+                        current.update(nextName, nextPath, nextDescription, nextVersion, nextEnabled, aiClock.nowShanghai());
+                        return serverRepository.save(current).map(McpServerAdminService::toSnapshot);
+                    });
         });
     }
 
     public Mono<Void> delete(String code) {
-        return jpaExecutor.run(() -> {
-            McpServerEntity entity = requireServer(code);
-            toolRepository.deleteByServerCode(entity.getCode());
-            serverRepository.delete(entity);
-        });
+        return requireServer(code)
+                .flatMap(entity -> transactionalOperator.transactional(toolRepository
+                        .deleteByServerCode(entity.getCode())
+                        .then(serverRepository.delete(entity))))
+                .then();
     }
 
-    McpServerEntity requireServer(String code) {
+    Mono<McpServerEntity> requireServer(String code) {
         if (code == null || code.isBlank()) {
-            throw new McpNotFoundException("MCP server not found");
+            return Mono.error(new McpNotFoundException("MCP server not found"));
         }
         return serverRepository
                 .findByCode(code)
-                .orElseThrow(() -> new McpNotFoundException("MCP server not found"));
+                .switchIfEmpty(Mono.error(new McpNotFoundException("MCP server not found")));
     }
 
     static McpServerSnapshot toSnapshot(McpServerEntity entity) {

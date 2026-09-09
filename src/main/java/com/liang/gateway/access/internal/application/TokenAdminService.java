@@ -4,13 +4,12 @@ import com.liang.gateway.access.QuotaLayer;
 import com.liang.gateway.access.QuotaStoreUnavailableException;
 import com.liang.gateway.access.internal.infrastructure.AccessClock;
 import com.liang.gateway.access.internal.infrastructure.IdentityCodes;
-import com.liang.gateway.access.internal.infrastructure.jpa.JpaExecutor;
-import com.liang.gateway.access.internal.infrastructure.jpa.UsageLimitEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UsageLimitRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenModelEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenModelRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UsageLimitEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UsageLimitRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenModelEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenModelRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -19,39 +18,36 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Service
 public class TokenAdminService {
 
-    private final JpaExecutor jpaExecutor;
     private final UserAccessTokenRepository tokenRepository;
     private final UsageLimitRepository usageLimitRepository;
     private final UserAccessTokenModelRepository tokenModelRepository;
     private final UserAdminService userAdminService;
     private final QuotaWindowStore quotaWindowStore;
     private final AccessClock accessClock;
-    private final TransactionTemplate transactionTemplate;
+    private final TransactionalOperator transactionalOperator;
 
     public TokenAdminService(
-            JpaExecutor jpaExecutor,
             UserAccessTokenRepository tokenRepository,
             UsageLimitRepository usageLimitRepository,
             UserAccessTokenModelRepository tokenModelRepository,
             UserAdminService userAdminService,
             QuotaWindowStore quotaWindowStore,
             AccessClock accessClock,
-            PlatformTransactionManager transactionManager) {
-        this.jpaExecutor = jpaExecutor;
+            TransactionalOperator transactionalOperator) {
         this.tokenRepository = tokenRepository;
         this.usageLimitRepository = usageLimitRepository;
         this.tokenModelRepository = tokenModelRepository;
         this.userAdminService = userAdminService;
         this.quotaWindowStore = quotaWindowStore;
         this.accessClock = accessClock;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionalOperator = transactionalOperator;
     }
 
     public Mono<TokenSnapshot> create(
@@ -67,27 +63,25 @@ public class TokenAdminService {
             List<QuotaLayer> layers = amountLayers(validatedLimits);
             return userAdminService
                     .requireUser(userCode)
-                    .then(jpaExecutor.call(() -> persist(
-                            userCode, qpmLimit, enabled, expireTime, validatedModels, validatedLimits)))
+                    .then(persist(userCode, qpmLimit, enabled, expireTime, validatedModels, validatedLimits))
                     .flatMap(saved -> quotaWindowStore
                             .openWindows(saved.getCode(), layers, accessClock.instant())
-                            .then(jpaExecutor.call(() -> toSnapshot(saved)))
-                            .onErrorResume(error -> jpaExecutor
-                                    .run(() -> deleteTokenGraph(saved.getCode()))
+                            .then(toSnapshot(saved))
+                            .onErrorResume(error -> deleteTokenGraph(saved.getCode())
                                     .then(Mono.error(asUnavailable(error)))));
         });
     }
 
     public Mono<List<TokenSnapshot>> list(String userCode) {
-        return userAdminService.requireUser(userCode).then(jpaExecutor.call(() -> tokenRepository
-                .findByUserCodeOrderByCreateTimeDesc(userCode)
-                .stream()
-                .map(this::toSnapshot)
-                .toList()));
+        return userAdminService
+                .requireUser(userCode)
+                .thenMany(tokenRepository.findByUserCodeOrderByCreateTimeDesc(userCode))
+                .concatMap(this::toSnapshot)
+                .collectList();
     }
 
     public Mono<TokenSnapshot> get(String userCode, String tokenCode) {
-        return loadOwned(userCode, tokenCode).flatMap(entity -> jpaExecutor.call(() -> toSnapshot(entity)));
+        return loadOwned(userCode, tokenCode).flatMap(this::toSnapshot);
     }
 
     public Mono<TokenSnapshot> update(
@@ -99,77 +93,83 @@ public class TokenAdminService {
             int qpmLimit,
             List<String> models,
             List<UsageLimitInput> limits) {
-        return loadOwned(userCode, tokenCode).flatMap(entity -> jpaExecutor
-                .call(() -> transactionTemplate.execute(status -> {
-                    boolean nextEnabled = enabled == null ? entity.isEnabled() : enabled;
-                    LocalDateTime nextExpire = expireTimePresent ? expireTime : entity.getExpireTime();
-                    entity.update(nextEnabled, nextExpire, qpmLimit, accessClock.nowShanghai());
-                    tokenRepository.save(entity);
-                    LocalDateTime now = accessClock.nowShanghai();
-                    if (models != null) {
-                        replaceModels(entity.getCode(), validateModels(models), now);
-                    }
-                    List<QuotaLayer> toEnsure = List.of();
-                    if (limits != null) {
-                        List<UsageLimitEntity> previous =
-                                usageLimitRepository.findByTokenCodeOrderByLimitTypeAsc(entity.getCode());
-                        List<UsageLimitInput> validated = validateLimits(limits);
-                        replaceLimits(entity.getUserCode(), entity.getCode(), validated, previous, now);
-                        toEnsure = amountLayers(validated);
-                    }
-                    return new UpdatePersist(entity, toEnsure);
-                }))
-                .flatMap(result -> quotaWindowStore
-                        .ensureWindows(result.entity().getCode(), result.toEnsure(), accessClock.instant())
-                        .then(jpaExecutor.call(() -> toSnapshot(result.entity())))));
+        return loadOwned(userCode, tokenCode).flatMap(entity -> {
+            boolean nextEnabled = enabled == null ? entity.isEnabled() : enabled;
+            LocalDateTime nextExpire = expireTimePresent ? expireTime : entity.getExpireTime();
+            entity.update(nextEnabled, nextExpire, qpmLimit, accessClock.nowShanghai());
+            LocalDateTime now = accessClock.nowShanghai();
+            List<String> nextModels = models == null ? null : validateModels(models);
+            List<UsageLimitInput> nextLimits = limits == null ? null : validateLimits(limits);
+            Mono<UpdatePersist> work = tokenRepository.save(entity).flatMap(saved -> {
+                Mono<Void> modelWrite =
+                        nextModels == null ? Mono.empty() : replaceModels(saved.getCode(), nextModels, now);
+                Mono<List<QuotaLayer>> limitWrite;
+                if (nextLimits == null) {
+                    limitWrite = Mono.just(List.of());
+                } else {
+                    limitWrite = usageLimitRepository
+                            .findByTokenCodeOrderByLimitTypeAsc(saved.getCode())
+                            .collectList()
+                            .flatMap(previous -> replaceLimits(
+                                            saved.getUserCode(), saved.getCode(), nextLimits, previous, now)
+                                    .thenReturn(amountLayers(nextLimits)));
+                }
+                return modelWrite.then(limitWrite).map(layers -> new UpdatePersist(saved, layers));
+            });
+            return transactionalOperator.transactional(work).flatMap(result -> quotaWindowStore
+                    .ensureWindows(result.entity().getCode(), result.toEnsure(), accessClock.instant())
+                    .then(toSnapshot(result.entity())));
+        });
     }
 
     public Mono<Void> resetQuota(String userCode, String tokenCode, QuotaLayer layer) {
         return loadOwned(userCode, tokenCode)
                 .then(quotaWindowStore.reset(tokenCode, layer, accessClock.instant()))
-                .flatMap(snapshot -> jpaExecutor.run(() -> usageLimitRepository
+                .flatMap(snapshot -> usageLimitRepository
                         .findByTokenCodeAndLimitType(tokenCode, DefaultAccessApi.limitType(layer))
-                        .ifPresent(entity -> {
+                        .flatMap(entity -> {
                             entity.updateUsed(snapshot.used(), accessClock.nowShanghai());
-                            usageLimitRepository.save(entity);
-                        })))
+                            return usageLimitRepository.save(entity);
+                        }))
                 .then();
     }
 
     private Mono<UserAccessTokenEntity> loadOwned(String userCode, String tokenCode) {
-        return userAdminService.requireUser(userCode).then(jpaExecutor.call(() -> tokenRepository.findByCode(tokenCode)))
-                .flatMap(optional -> {
-                    if (optional.isEmpty() || !userCode.equals(optional.get().getUserCode())) {
+        return userAdminService
+                .requireUser(userCode)
+                .then(tokenRepository.findByCode(tokenCode))
+                .switchIfEmpty(Mono.error(new AccessNotFoundException("Access token not found")))
+                .flatMap(entity -> {
+                    if (!userCode.equals(entity.getUserCode())) {
                         return Mono.error(new AccessNotFoundException("Access token not found"));
                     }
-                    return Mono.just(optional.get());
+                    return Mono.just(entity);
                 });
     }
 
-    private UserAccessTokenEntity persist(
+    private Mono<UserAccessTokenEntity> persist(
             String userCode,
             int qpmLimit,
             boolean enabled,
             LocalDateTime expireTime,
             List<String> models,
             List<UsageLimitInput> limits) {
-        return transactionTemplate.execute(status -> {
-            LocalDateTime now = accessClock.nowShanghai();
-            UserAccessTokenEntity saved = tokenRepository.save(UserAccessTokenEntity.create(
-                    IdentityCodes.tokenCode(),
-                    userCode,
-                    IdentityCodes.accessToken(),
-                    enabled,
-                    expireTime,
-                    qpmLimit,
-                    now));
-            replaceLimits(userCode, saved.getCode(), limits, List.of(), now);
-            replaceModels(saved.getCode(), models, now);
-            return saved;
-        });
+        LocalDateTime now = accessClock.nowShanghai();
+        return transactionalOperator.transactional(tokenRepository
+                .save(UserAccessTokenEntity.create(
+                        IdentityCodes.tokenCode(),
+                        userCode,
+                        IdentityCodes.accessToken(),
+                        enabled,
+                        expireTime,
+                        qpmLimit,
+                        now))
+                .flatMap(saved -> replaceLimits(userCode, saved.getCode(), limits, List.of(), now)
+                        .then(replaceModels(saved.getCode(), models, now))
+                        .thenReturn(saved)));
     }
 
-    private void replaceLimits(
+    private Mono<Void> replaceLimits(
             String userCode,
             String tokenCode,
             List<UsageLimitInput> limits,
@@ -177,51 +177,52 @@ public class TokenAdminService {
             LocalDateTime now) {
         Map<Integer, Long> previousUsed = previous.stream()
                 .collect(Collectors.toMap(UsageLimitEntity::getLimitType, UsageLimitEntity::getUsed, (left, right) -> left));
-        usageLimitRepository.deleteByTokenCode(tokenCode);
-        usageLimitRepository.flush();
-        for (UsageLimitInput input : limits) {
-            long used = previousUsed.getOrDefault(input.limitType(), 0L);
-            usageLimitRepository.save(
-                    UsageLimitEntity.create(userCode, tokenCode, input.limitType(), input.usage(), used, now));
-        }
+        return usageLimitRepository.deleteByTokenCode(tokenCode).thenMany(Flux.fromIterable(limits).concatMap(input -> {
+                    long used = previousUsed.getOrDefault(input.limitType(), 0L);
+                    return usageLimitRepository.save(UsageLimitEntity.create(
+                            userCode, tokenCode, input.limitType(), input.usage(), used, now));
+                }))
+                .then();
     }
 
-    private void replaceModels(String tokenCode, List<String> models, LocalDateTime now) {
-        tokenModelRepository.deleteByTokenCode(tokenCode);
-        tokenModelRepository.flush();
-        for (String model : models) {
-            tokenModelRepository.save(UserAccessTokenModelEntity.create(tokenCode, model, now));
-        }
+    private Mono<Void> replaceModels(String tokenCode, List<String> models, LocalDateTime now) {
+        return tokenModelRepository
+                .deleteByTokenCode(tokenCode)
+                .thenMany(Flux.fromIterable(models)
+                        .concatMap(model ->
+                                tokenModelRepository.save(UserAccessTokenModelEntity.create(tokenCode, model, now))))
+                .then();
     }
 
-    private void deleteTokenGraph(String tokenCode) {
-        transactionTemplate.executeWithoutResult(status -> {
-            tokenModelRepository.deleteByTokenCode(tokenCode);
-            usageLimitRepository.deleteByTokenCode(tokenCode);
-            tokenRepository.deleteByCode(tokenCode);
-        });
+    private Mono<Void> deleteTokenGraph(String tokenCode) {
+        return transactionalOperator.transactional(tokenModelRepository
+                .deleteByTokenCode(tokenCode)
+                .then(usageLimitRepository.deleteByTokenCode(tokenCode))
+                .then(tokenRepository.deleteByCode(tokenCode))
+                .then());
     }
 
-    private TokenSnapshot toSnapshot(UserAccessTokenEntity entity) {
-        List<String> models = tokenModelRepository.findByTokenCodeOrderByModelAsc(entity.getCode()).stream()
+    private Mono<TokenSnapshot> toSnapshot(UserAccessTokenEntity entity) {
+        Mono<List<String>> models = tokenModelRepository
+                .findByTokenCodeOrderByModelAsc(entity.getCode())
                 .map(UserAccessTokenModelEntity::getModel)
-                .toList();
-        List<UsageLimitSnapshot> limits = usageLimitRepository
+                .collectList();
+        Mono<List<UsageLimitSnapshot>> limits = usageLimitRepository
                 .findByTokenCodeOrderByLimitTypeAsc(entity.getCode())
-                .stream()
                 .map(item -> new UsageLimitSnapshot(item.getLimitType(), item.getUsage(), item.getUsed()))
-                .toList();
-        return new TokenSnapshot(
-                entity.getCode(),
-                entity.getUserCode(),
-                entity.getAccessToken(),
-                entity.isEnabled(),
-                entity.getExpireTime(),
-                entity.getQpmLimit(),
-                models,
-                limits,
-                entity.getCreateTime(),
-                entity.getUpdateTime());
+                .collectList();
+        return Mono.zip(models, limits)
+                .map(tuple -> new TokenSnapshot(
+                        entity.getCode(),
+                        entity.getUserCode(),
+                        entity.getAccessToken(),
+                        entity.isEnabled(),
+                        entity.getExpireTime(),
+                        entity.getQpmLimit(),
+                        tuple.getT1(),
+                        tuple.getT2(),
+                        entity.getCreateTime(),
+                        entity.getUpdateTime()));
     }
 
     static List<UsageLimitInput> validateLimits(List<UsageLimitInput> limits) {

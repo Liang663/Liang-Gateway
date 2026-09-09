@@ -1,43 +1,34 @@
-package com.liang.gateway.access.internal.infrastructure.jpa;
+package com.liang.gateway.access.internal.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "user_access_token")
-public class UserAccessTokenEntity {
+@Table("user_access_token")
+public class UserAccessTokenEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "code", nullable = false, unique = true, length = 64)
+    @Column("code")
     private String code;
 
-    @Column(name = "user_code", nullable = false, length = 64)
+    @Column("user_code")
     private String userCode;
 
-    @Column(name = "access_token", nullable = false, unique = true, length = 128)
+    @Column("access_token")
     private String accessToken;
 
-    @Column(name = "enabled", nullable = false)
+    @Column("enabled")
     private boolean enabled;
 
-    @Column(name = "expire_time")
+    @Column("expire_time")
     private LocalDateTime expireTime;
 
-    @Column(name = "qpm_limit", nullable = false)
+    @Column("qpm_limit")
     private int qpmLimit;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "update_time", nullable = false)
+    @Column("update_time")
     private LocalDateTime updateTime;
 
     protected UserAccessTokenEntity() {}
@@ -60,10 +51,6 @@ public class UserAccessTokenEntity {
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getCode() {

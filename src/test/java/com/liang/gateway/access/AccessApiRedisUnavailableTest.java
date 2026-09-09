@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.liang.gateway.access.internal.application.TokenAdminService;
 import com.liang.gateway.access.internal.application.UsageLimitInput;
 import com.liang.gateway.access.internal.application.UserAdminService;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserRepository;
 import com.liang.gateway.support.TestTokens;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -75,9 +75,10 @@ class AccessApiRedisUnavailableTest {
         String userCode = "usr_down_" + System.nanoTime();
         String tokenCode = "tok_down_" + System.nanoTime();
         LocalDateTime now = LocalDateTime.of(2026, 9, 3, 10, 0, 0);
-        userRepository.save(UserEntity.create(userCode, "down-check", "DATA", true, now));
-        tokenRepository.save(UserAccessTokenEntity.create(
-                tokenCode, userCode, "at_down_" + System.nanoTime(), true, null, 10, now));
+        userRepository.save(UserEntity.create(userCode, "down-check", "DATA", true, now)).block();
+        tokenRepository
+                .save(UserAccessTokenEntity.create(tokenCode, userCode, "at_down_" + System.nanoTime(), true, null, 10, now))
+                .block();
 
         StepVerifier.create(accessApi.checkQuota(tokenCode))
                 .expectError(QuotaStoreUnavailableException.class)
@@ -100,6 +101,6 @@ class AccessApiRedisUnavailableTest {
                 .expectError(QuotaStoreUnavailableException.class)
                 .verify(Duration.ofSeconds(8));
 
-        assertThat(tokenRepository.findByUserCodeOrderByCreateTimeDesc(user.code())).isEmpty();
+        assertThat(tokenRepository.findByUserCodeOrderByCreateTimeDesc(user.code()).collectList().block()).isEmpty();
     }
 }

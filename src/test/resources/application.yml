@@ -6,6 +6,10 @@ spring:
     url: jdbc:mysql://127.0.0.1:3307/liang_gateway_test?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: liang
+  r2dbc:
+    url: r2dbc:mysql://127.0.0.1:3307/liang_gateway_test?connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
+    username: root
+    password: liang
   data:
     redis:
       host: 127.0.0.1

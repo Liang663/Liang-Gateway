@@ -122,7 +122,7 @@ MCP 与 Chat 各走各的数据面服务，互不调用。
 
 - `ai` 里 `chat` 与 `mcp` 互相污染时，拆成两个 Modulith 模块；orchestration 多依赖一个即可。不要为此先拆。
 - `core` 要上注册中心 / 多种 LB 时再拆。
-- 基础设施模块：WebClient/JPA/Redis 封装出现多处复制再抽。
+- 基础设施模块：WebClient/R2DBC/Redis 封装出现多处复制再抽。
 
 ---
 

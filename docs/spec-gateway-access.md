@@ -70,7 +70,7 @@
 - 记账入参含 prompt、completion、金额（分）、模型名。金额由 ai 算好经编排传入。Chat 路径必须先拿到上游 usage 再记；不是「没 usage 就记 0」。失败出站不写用量明细。
 - MCP 数据面不调本领域 `checkQuota` / `recordUsage`。QPM 与金额窗只约束模型调用。
 - 鉴权上下文：`user.code`、`token.code`。出站 Key 不再挂在令牌上。
-- 表结构以 SQL 为准。
+- 表结构以 SQL 为准。运行时访问用 R2DBC；Flyway 仍是执行源。
 
 ## 6. 领域规约
 

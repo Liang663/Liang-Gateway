@@ -1,13 +1,11 @@
 package com.liang.gateway.ai.internal.mcp.application;
 
 import com.liang.gateway.ai.internal.infrastructure.AiClock;
-import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;
 import com.liang.gateway.ai.internal.mcp.domain.OpenApiToolImporter;
 import com.liang.gateway.ai.internal.mcp.domain.ToolArgDefinitions;
 import com.liang.gateway.ai.internal.mcp.infrastructure.McpIdentityCodes;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpServerEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolEntity;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import java.time.LocalDateTime;
@@ -17,8 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -26,26 +24,23 @@ public class McpToolAdminService {
 
     private static final int DEFAULT_TIMEOUT_MS = 30_000;
 
-    private final AiJpaExecutor jpaExecutor;
     private final McpServerAdminService serverAdminService;
     private final McpToolRepository toolRepository;
     private final AiClock aiClock;
     private final JsonMapper objectMapper;
-    private final TransactionTemplate transactionTemplate;
+    private final TransactionalOperator transactionalOperator;
 
     public McpToolAdminService(
-            AiJpaExecutor jpaExecutor,
             McpServerAdminService serverAdminService,
             McpToolRepository toolRepository,
             AiClock aiClock,
             JsonMapper objectMapper,
-            PlatformTransactionManager transactionManager) {
-        this.jpaExecutor = jpaExecutor;
+            TransactionalOperator transactionalOperator) {
         this.serverAdminService = serverAdminService;
         this.toolRepository = toolRepository;
         this.aiClock = aiClock;
         this.objectMapper = objectMapper;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionalOperator = transactionalOperator;
     }
 
     public Mono<McpToolSnapshot> create(
@@ -58,38 +53,35 @@ public class McpToolAdminService {
             Integer timeoutMs,
             Object args,
             boolean enabled) {
-        return jpaExecutor.call(() -> {
-            McpServerEntity server = serverAdminService.requireServer(serverCode);
+        return serverAdminService.requireServer(serverCode).flatMap(server -> {
             JsonNode argsNode = McpJsonSupport.argsNode(objectMapper, args);
             ValidatedTool validated = validateTool(name, description, httpUrl, httpMethod, timeoutMs, argsNode);
-            requireUniqueName(server.getCode(), validated.name(), null);
-            McpToolEntity saved = toolRepository.save(McpToolEntity.create(
-                    McpIdentityCodes.toolCode(),
-                    server.getCode(),
-                    validated.name(),
-                    validated.description(),
-                    validated.httpUrl(),
-                    validated.httpMethod(),
-                    McpJsonSupport.writeHeaders(objectMapper, httpHeaders),
-                    validated.timeoutMs(),
-                    validated.argsJson(),
-                    enabled,
-                    aiClock.nowShanghai()));
-            return toSnapshot(saved);
+            return requireUniqueName(server.getCode(), validated.name(), null)
+                    .then(toolRepository.save(McpToolEntity.create(
+                            McpIdentityCodes.toolCode(),
+                            server.getCode(),
+                            validated.name(),
+                            validated.description(),
+                            validated.httpUrl(),
+                            validated.httpMethod(),
+                            McpJsonSupport.writeHeaders(objectMapper, httpHeaders),
+                            validated.timeoutMs(),
+                            validated.argsJson(),
+                            enabled,
+                            aiClock.nowShanghai())))
+                    .map(this::toSnapshot);
         });
     }
 
     public Mono<List<McpToolSnapshot>> list(String serverCode) {
-        return jpaExecutor.call(() -> {
-            McpServerEntity server = serverAdminService.requireServer(serverCode);
-            return toolRepository.findByServerCodeOrderByNameAsc(server.getCode()).stream()
-                    .map(this::toSnapshot)
-                    .toList();
-        });
+        return serverAdminService
+                .requireServer(serverCode)
+                .thenMany(toolRepository.findByServerCodeOrderByNameAsc(serverCode).map(this::toSnapshot))
+                .collectList();
     }
 
     public Mono<McpToolSnapshot> get(String serverCode, String toolCode) {
-        return jpaExecutor.call(() -> toSnapshot(requireTool(serverCode, toolCode)));
+        return requireTool(serverCode, toolCode).map(this::toSnapshot);
     }
 
     public Mono<McpToolSnapshot> update(
@@ -104,8 +96,7 @@ public class McpToolAdminService {
             Integer timeoutMs,
             Object args,
             Boolean enabled) {
-        return jpaExecutor.call(() -> {
-            McpToolEntity entity = requireTool(serverCode, toolCode);
+        return requireTool(serverCode, toolCode).flatMap(entity -> {
             String nextName = name == null ? entity.getName() : name;
             String nextDescription = description == null ? entity.getDescription() : description;
             String nextUrl = httpUrl == null ? entity.getHttpUrl() : httpUrl;
@@ -115,93 +106,95 @@ public class McpToolAdminService {
                     ? McpJsonSupport.readTree(objectMapper, entity.getArgs(), "args")
                     : McpJsonSupport.argsNode(objectMapper, args);
             ValidatedTool validated = validateTool(nextName, nextDescription, nextUrl, nextMethod, nextTimeout, nextArgs);
-            requireUniqueName(entity.getServerCode(), validated.name(), entity.getCode());
             String nextHeaders = httpHeadersPresent
                     ? McpJsonSupport.writeHeaders(objectMapper, httpHeaders)
                     : entity.getHttpHeaders();
             boolean nextEnabled = enabled == null ? entity.isEnabled() : enabled;
-            entity.update(
-                    validated.name(),
-                    validated.description(),
-                    validated.httpUrl(),
-                    validated.httpMethod(),
-                    nextHeaders,
-                    validated.timeoutMs(),
-                    validated.argsJson(),
-                    nextEnabled,
-                    aiClock.nowShanghai());
-            return toSnapshot(toolRepository.save(entity));
+            return requireUniqueName(entity.getServerCode(), validated.name(), entity.getCode())
+                    .then(Mono.fromCallable(() -> {
+                        entity.update(
+                                validated.name(),
+                                validated.description(),
+                                validated.httpUrl(),
+                                validated.httpMethod(),
+                                nextHeaders,
+                                validated.timeoutMs(),
+                                validated.argsJson(),
+                                nextEnabled,
+                                aiClock.nowShanghai());
+                        return entity;
+                    }))
+                    .flatMap(toolRepository::save)
+                    .map(this::toSnapshot);
         });
     }
 
     public Mono<Void> delete(String serverCode, String toolCode) {
-        return jpaExecutor.run(() -> {
-            McpToolEntity entity = requireTool(serverCode, toolCode);
-            toolRepository.delete(entity);
-        });
+        return requireTool(serverCode, toolCode).flatMap(toolRepository::delete);
     }
 
     public Mono<List<McpToolSnapshot>> importTools(String serverCode, JsonNode swagger, List<String> paths) {
-        return jpaExecutor.call(() -> transactionTemplate.execute(status -> {
-            McpServerEntity server = serverAdminService.requireServer(serverCode);
+        return serverAdminService.requireServer(serverCode).flatMap(server -> {
             List<OpenApiToolImporter.Draft> drafts;
             try {
                 drafts = OpenApiToolImporter.importSelected(swagger, paths, objectMapper);
             } catch (IllegalArgumentException ex) {
-                throw new McpBadRequestException(ex.getMessage());
+                return Mono.error(new McpBadRequestException(ex.getMessage()));
             }
             Set<String> batchNames = new LinkedHashSet<>();
             List<ValidatedTool> validated = new ArrayList<>();
             for (OpenApiToolImporter.Draft draft : drafts) {
                 if (!batchNames.add(draft.name())) {
-                    throw new McpBadRequestException("duplicate tool name: " + draft.name());
+                    return Mono.error(new McpBadRequestException("duplicate tool name: " + draft.name()));
                 }
-                requireUniqueName(server.getCode(), draft.name(), null);
-                validated.add(validateTool(
-                        draft.name(),
-                        draft.description(),
-                        draft.httpUrl(),
-                        draft.httpMethod(),
-                        DEFAULT_TIMEOUT_MS,
-                        draft.args()));
+                try {
+                    validated.add(validateTool(
+                            draft.name(),
+                            draft.description(),
+                            draft.httpUrl(),
+                            draft.httpMethod(),
+                            DEFAULT_TIMEOUT_MS,
+                            draft.args()));
+                } catch (RuntimeException ex) {
+                    return Mono.error(ex);
+                }
             }
             LocalDateTime now = aiClock.nowShanghai();
-            List<McpToolSnapshot> created = new ArrayList<>();
-            for (ValidatedTool tool : validated) {
-                McpToolEntity saved = toolRepository.save(McpToolEntity.create(
-                        McpIdentityCodes.toolCode(),
-                        server.getCode(),
-                        tool.name(),
-                        tool.description(),
-                        tool.httpUrl(),
-                        tool.httpMethod(),
-                        null,
-                        tool.timeoutMs(),
-                        tool.argsJson(),
-                        true,
-                        now));
-                created.add(toSnapshot(saved));
+            Mono<List<McpToolSnapshot>> write = Flux.fromIterable(validated)
+                    .concatMap(tool -> requireUniqueName(server.getCode(), tool.name(), null)
+                            .then(toolRepository.save(McpToolEntity.create(
+                                    McpIdentityCodes.toolCode(),
+                                    server.getCode(),
+                                    tool.name(),
+                                    tool.description(),
+                                    tool.httpUrl(),
+                                    tool.httpMethod(),
+                                    null,
+                                    tool.timeoutMs(),
+                                    tool.argsJson(),
+                                    true,
+                                    now)))
+                            .map(this::toSnapshot))
+                    .collectList();
+            return transactionalOperator.transactional(write);
+        });
+    }
+
+    private Mono<McpToolEntity> requireTool(String serverCode, String toolCode) {
+        return serverAdminService.requireServer(serverCode).then(toolRepository.findByCode(toolCode)).flatMap(entity -> {
+            if (!entity.getServerCode().equals(serverCode)) {
+                return Mono.error(new McpNotFoundException("MCP tool not found"));
             }
-            return List.copyOf(created);
-        }));
+            return Mono.just(entity);
+        }).switchIfEmpty(Mono.error(new McpNotFoundException("MCP tool not found")));
     }
 
-    private McpToolEntity requireTool(String serverCode, String toolCode) {
-        serverAdminService.requireServer(serverCode);
-        McpToolEntity entity = toolRepository
-                .findByCode(toolCode)
-                .orElseThrow(() -> new McpNotFoundException("MCP tool not found"));
-        if (!entity.getServerCode().equals(serverCode)) {
-            throw new McpNotFoundException("MCP tool not found");
-        }
-        return entity;
-    }
-
-    private void requireUniqueName(String serverCode, String name, String currentCode) {
-        toolRepository.findByServerCodeAndName(serverCode, name).ifPresent(existing -> {
+    private Mono<Void> requireUniqueName(String serverCode, String name, String currentCode) {
+        return toolRepository.findByServerCodeAndName(serverCode, name).flatMap(existing -> {
             if (currentCode == null || !existing.getCode().equals(currentCode)) {
-                throw new McpBadRequestException("tool name already exists");
+                return Mono.error(new McpBadRequestException("tool name already exists"));
             }
+            return Mono.empty();
         });
     }
 

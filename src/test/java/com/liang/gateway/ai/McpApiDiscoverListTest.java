@@ -7,8 +7,8 @@ import com.liang.gateway.ai.internal.mcp.application.McpServerAdminService;
 import com.liang.gateway.ai.internal.mcp.application.McpServerSnapshot;
 import com.liang.gateway.ai.internal.mcp.application.McpToolAdminService;
 import com.liang.gateway.ai.internal.mcp.infrastructure.McpIdentityCodes;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolEntity;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolRepository;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -196,7 +196,8 @@ class McpApiDiscoverListTest {
                 30000,
                 "{}",
                 true,
-                aiClock.nowShanghai()));
+                aiClock.nowShanghai()))
+                .block();
         StepVerifier.create(mcpApi.listTools(path))
                 .assertNext(result -> {
                     assertThat(result.tools()).extracting(McpToolsListResult.Tool::name).containsExactly("alpha", "broken");

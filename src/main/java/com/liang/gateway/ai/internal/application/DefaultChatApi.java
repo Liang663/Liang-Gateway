@@ -13,13 +13,12 @@ import com.liang.gateway.ai.ModelView;
 import com.liang.gateway.ai.TokenCounts;
 import com.liang.gateway.ai.internal.infrastructure.AiClock;
 import com.liang.gateway.ai.internal.infrastructure.IdentityCodes;
-import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmApikeyConfigEntity;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmApikeyConfigRepository;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogEntity;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogRepository;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmModelEntity;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmModelRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmApikeyConfigEntity;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmApikeyConfigRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogEntity;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmModelEntity;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmModelRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -40,7 +39,6 @@ public class DefaultChatApi implements ChatApi {
     private static final Logger log = LoggerFactory.getLogger(DefaultChatApi.class);
     private static final BigDecimal MILLION = BigDecimal.valueOf(1_000_000L);
 
-    private final AiJpaExecutor jpaExecutor;
     private final LlmModelRepository modelRepository;
     private final LlmApikeyConfigRepository apikeyRepository;
     private final LlmCallLogRepository callLogRepository;
@@ -48,13 +46,11 @@ public class DefaultChatApi implements ChatApi {
     private final JsonMapper objectMapper;
 
     public DefaultChatApi(
-            AiJpaExecutor jpaExecutor,
             LlmModelRepository modelRepository,
             LlmApikeyConfigRepository apikeyRepository,
             LlmCallLogRepository callLogRepository,
             AiClock aiClock,
             JsonMapper objectMapper) {
-        this.jpaExecutor = jpaExecutor;
         this.modelRepository = modelRepository;
         this.apikeyRepository = apikeyRepository;
         this.callLogRepository = callLogRepository;
@@ -64,13 +60,14 @@ public class DefaultChatApi implements ChatApi {
 
     @Override
     public Mono<List<ModelView>> listModels() {
-        return jpaExecutor.call(() -> modelRepository.findByEnabledTrueOrderByNameAsc().stream()
+        return modelRepository
+                .findByEnabledTrueOrderByNameAsc()
                 .map(model -> new ModelView(
                         model.getName(),
                         model.getProvider(),
                         model.getInputPriceFenPerMillion(),
                         model.getOutputPriceFenPerMillion()))
-                .toList());
+                .collectList();
     }
 
     @Override
@@ -79,31 +76,33 @@ public class DefaultChatApi implements ChatApi {
             return Mono.error(new AiBadRequestException("model is required"));
         }
         byte[] inbound = requestBody == null ? new byte[0] : requestBody;
-        return jpaExecutor.call(() -> {
-            LlmModelEntity catalog = modelRepository
-                    .findByName(model)
-                    .orElseThrow(() -> new AiNotFoundException("Model is not available"));
-            if (!catalog.isEnabled()) {
-                throw new AiNotFoundException("Model is not available");
-            }
-            LlmApikeyConfigEntity apikey = apikeyRepository
-                    .findByCode(catalog.getApikeyCode())
-                    .orElseThrow(() -> new AiNotFoundException("Model is not available"));
-            if (!apikey.isEnabled() || apikey.isExpired(aiClock.nowShanghai())) {
-                throw new AiNotFoundException("Model is not available");
-            }
-            PreparedBody prepared = prepareBody(inbound);
-            log.debug("Prepared upstream for model {} using key prefix {}", catalog.getName(), apikey.getPrefix());
-            Map<String, String> headers = new LinkedHashMap<>();
-            headers.put("Authorization", "Bearer " + apikey.getSecret());
-            headers.put("Content-Type", "application/json");
-            return new ChatUpstream(
-                    chatCompletionsUrl(apikey.getBaseUrl()),
-                    headers,
-                    prepared.body(),
-                    prepared.stream(),
-                    apikey.getCode());
-        });
+        return requireEnabledModel(model).flatMap(catalog -> apikeyRepository
+                .findByCode(catalog.getApikeyCode())
+                .switchIfEmpty(Mono.error(new AiNotFoundException("Model is not available")))
+                .flatMap(apikey -> {
+                    if (!apikey.isEnabled() || apikey.isExpired(aiClock.nowShanghai())) {
+                        return Mono.error(new AiNotFoundException("Model is not available"));
+                    }
+                    PreparedBody prepared;
+                    try {
+                        prepared = prepareBody(inbound);
+                    } catch (AiBadRequestException ex) {
+                        return Mono.error(ex);
+                    }
+                    log.debug(
+                            "Prepared upstream for model {} using key prefix {}",
+                            catalog.getName(),
+                            apikey.getPrefix());
+                    Map<String, String> headers = new LinkedHashMap<>();
+                    headers.put("Authorization", "Bearer " + apikey.getSecret());
+                    headers.put("Content-Type", "application/json");
+                    return Mono.just(new ChatUpstream(
+                            chatCompletionsUrl(apikey.getBaseUrl()),
+                            headers,
+                            prepared.body(),
+                            prepared.stream(),
+                            apikey.getCode()));
+                }));
     }
 
     @Override
@@ -111,10 +110,7 @@ public class DefaultChatApi implements ChatApi {
         if (model == null || model.isBlank()) {
             return Mono.error(new AiBadRequestException("model is required"));
         }
-        return jpaExecutor.call(() -> {
-            LlmModelEntity catalog = modelRepository
-                    .findByName(model)
-                    .orElseThrow(() -> new AiNotFoundException("Model is not available"));
+        return requireModel(model).map(catalog -> {
             TokenCounts counts = tokenCounts(usageFromJson(jsonBody));
             if (counts == null) {
                 return Optional.empty();
@@ -136,12 +132,7 @@ public class DefaultChatApi implements ChatApi {
         if (tokens == null) {
             return Mono.error(new AiBadRequestException("tokens is required"));
         }
-        return jpaExecutor.call(() -> {
-            LlmModelEntity catalog = modelRepository
-                    .findByName(model)
-                    .orElseThrow(() -> new AiNotFoundException("Model is not available"));
-            return toChatUsage(catalog, tokens);
-        });
+        return requireModel(model).map(catalog -> toChatUsage(catalog, tokens));
     }
 
     @Override
@@ -177,24 +168,33 @@ public class DefaultChatApi implements ChatApi {
         if (model == null || model.isBlank()) {
             return Mono.error(new AiBadRequestException("model is required"));
         }
-        return jpaExecutor.call(() -> {
-            LlmApikeyConfigEntity apikey = apikeyRepository.findByCode(llmApikeyCode).orElse(null);
-            String prefix = apikey == null ? "" : apikey.getPrefix();
-            String secret = apikey == null ? null : apikey.getSecret();
-            String sanitized = sanitizeMessage(message, secret);
-            LocalDateTime now = aiClock.nowShanghai();
-            callLogRepository.save(LlmCallLogEntity.create(
-                    IdentityCodes.callLogCode(),
-                    llmApikeyCode,
-                    model,
-                    success,
-                    sanitized,
-                    firstTokenMs,
-                    totalDurationMs,
-                    now));
-            log.debug("Recorded call log for key prefix {} model {} success {}", prefix, model, success);
-            return null;
-        }).then();
+        return apikeyRepository
+                .findByCode(llmApikeyCode)
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(optional -> {
+                    LlmApikeyConfigEntity apikey = optional.orElse(null);
+                    String prefix = apikey == null ? "" : apikey.getPrefix();
+                    String secret = apikey == null ? null : apikey.getSecret();
+                    String sanitized = sanitizeMessage(message, secret);
+                    LocalDateTime now = aiClock.nowShanghai();
+                    return callLogRepository
+                            .save(LlmCallLogEntity.create(
+                                    IdentityCodes.callLogCode(),
+                                    llmApikeyCode,
+                                    model,
+                                    success,
+                                    sanitized,
+                                    firstTokenMs,
+                                    totalDurationMs,
+                                    now))
+                            .doOnSuccess(unused -> log.debug(
+                                    "Recorded call log for key prefix {} model {} success {}",
+                                    prefix,
+                                    model,
+                                    success));
+                })
+                .then();
     }
 
     @Override
@@ -207,19 +207,36 @@ public class DefaultChatApi implements ChatApi {
                 : LocalDateTime.ofInstant(from, AiClock.SHANGHAI);
         LocalDateTime toTime = to == null ? aiClock.nowShanghai() : LocalDateTime.ofInstant(to, AiClock.SHANGHAI);
         String modelFilter = model == null || model.isBlank() ? null : model;
-        return jpaExecutor.call(() -> {
-            List<LlmCallLogEntity> rows =
-                    callLogRepository.findForStats(llmApikeyCode, fromTime, toTime, modelFilter);
-            long total = rows.size();
-            long success = rows.stream().filter(LlmCallLogEntity::isSuccess).count();
-            var averageOpt = rows.stream()
-                    .map(LlmCallLogEntity::getFirstTokenMs)
-                    .filter(value -> value != null)
-                    .mapToInt(Integer::intValue)
-                    .average();
-            Double average = averageOpt.isPresent() ? averageOpt.getAsDouble() : null;
-            double failureRate = total == 0 ? 0.0d : (double) (total - success) / (double) total;
-            return new CallLogStats(total, success, average, failureRate);
+        return callLogRepository
+                .findForStats(llmApikeyCode, fromTime, toTime)
+                .filter(row -> modelFilter == null || modelFilter.equals(row.getModel()))
+                .collectList()
+                .map(rows -> {
+                    long total = rows.size();
+                    long success = rows.stream().filter(LlmCallLogEntity::isSuccess).count();
+                    var averageOpt = rows.stream()
+                            .map(LlmCallLogEntity::getFirstTokenMs)
+                            .filter(value -> value != null)
+                            .mapToInt(Integer::intValue)
+                            .average();
+                    Double average = averageOpt.isPresent() ? averageOpt.getAsDouble() : null;
+                    double failureRate = total == 0 ? 0.0d : (double) (total - success) / (double) total;
+                    return new CallLogStats(total, success, average, failureRate);
+                });
+    }
+
+    private Mono<LlmModelEntity> requireModel(String model) {
+        return modelRepository
+                .findByName(model)
+                .switchIfEmpty(Mono.error(new AiNotFoundException("Model is not available")));
+    }
+
+    private Mono<LlmModelEntity> requireEnabledModel(String model) {
+        return requireModel(model).flatMap(catalog -> {
+            if (!catalog.isEnabled()) {
+                return Mono.error(new AiNotFoundException("Model is not available"));
+            }
+            return Mono.just(catalog);
         });
     }
 

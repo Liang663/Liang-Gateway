@@ -8,17 +8,16 @@ import com.liang.gateway.ai.McpCallResult;
 import com.liang.gateway.ai.McpDiscoverResult;
 import com.liang.gateway.ai.McpServerNotFoundException;
 import com.liang.gateway.ai.McpToolsListResult;
-import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;
 import com.liang.gateway.ai.internal.mcp.domain.McpCallWrapper;
 import com.liang.gateway.ai.internal.mcp.domain.McpFailureTexts;
 import com.liang.gateway.ai.internal.mcp.domain.McpJsonRpc;
 import com.liang.gateway.ai.internal.mcp.domain.McpProtocol;
 import com.liang.gateway.ai.internal.mcp.domain.ToolArgDefinitions;
 import com.liang.gateway.ai.internal.mcp.domain.ToolCallAssembler;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpServerEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpServerRepository;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpServerEntity;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpServerRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolEntity;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
@@ -29,17 +28,12 @@ import reactor.core.publisher.Mono;
 @Service
 public class DefaultMcpApi implements McpApi {
 
-    private final AiJpaExecutor jpaExecutor;
     private final McpServerRepository serverRepository;
     private final McpToolRepository toolRepository;
     private final JsonMapper objectMapper;
 
     public DefaultMcpApi(
-            AiJpaExecutor jpaExecutor,
-            McpServerRepository serverRepository,
-            McpToolRepository toolRepository,
-            JsonMapper objectMapper) {
-        this.jpaExecutor = jpaExecutor;
+            McpServerRepository serverRepository, McpToolRepository toolRepository, JsonMapper objectMapper) {
         this.serverRepository = serverRepository;
         this.toolRepository = toolRepository;
         this.objectMapper = objectMapper;
@@ -49,7 +43,7 @@ public class DefaultMcpApi implements McpApi {
     public Mono<McpDiscoverResult> discover(String serverPath, String protocolVersion) {
         return Mono.defer(() -> {
             McpProtocol.requireSupported(protocolVersion);
-            return jpaExecutor.call(() -> toDiscover(requireEnabledServer(serverPath)));
+            return requireEnabledServer(serverPath).map(this::toDiscover);
         });
     }
 
@@ -57,15 +51,11 @@ public class DefaultMcpApi implements McpApi {
     public Mono<McpToolsListResult> listTools(String serverPath, String protocolVersion) {
         return Mono.defer(() -> {
             McpProtocol.requireSupported(protocolVersion);
-            return jpaExecutor.call(() -> {
-                McpServerEntity server = requireEnabledServer(serverPath);
-                List<McpToolsListResult.Tool> tools = toolRepository
-                        .findByServerCodeAndEnabledTrueOrderByNameAsc(server.getCode())
-                        .stream()
-                        .map(this::toToolSafe)
-                        .toList();
-                return new McpToolsListResult(tools, "complete", 0L, "private");
-            });
+            return requireEnabledServer(serverPath).flatMap(server -> toolRepository
+                    .findByServerCodeAndEnabledTrueOrderByNameAsc(server.getCode())
+                    .map(this::toToolSafe)
+                    .collectList()
+                    .map(tools -> new McpToolsListResult(tools, "complete", 0L, "private")));
         });
     }
 
@@ -74,44 +64,14 @@ public class DefaultMcpApi implements McpApi {
             String serverPath, String toolName, Map<String, Object> arguments, String protocolVersion) {
         return Mono.defer(() -> {
             McpProtocol.requireSupported(protocolVersion);
-            return jpaExecutor.call(() -> {
-                McpServerEntity server = requireEnabledServer(serverPath);
-                if (toolName == null || toolName.isBlank()) {
-                    return new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()));
-                }
-                McpToolEntity tool = toolRepository
-                        .findByServerCodeAndName(server.getCode(), toolName)
-                        .orElse(null);
-                if (tool == null || !tool.isEnabled()) {
-                    return new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()));
-                }
-                JsonNode args;
-                JsonNode headers;
-                try {
-                    args = parseArgs(tool.getArgs());
-                    headers = parseHeaders(tool.getHttpHeaders());
-                } catch (RuntimeException ex) {
-                    return new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()));
-                }
-                JsonNode argumentNode = objectMapper.valueToTree(arguments == null ? Map.of() : arguments);
-                ToolCallAssembler.Result assembled;
-                try {
-                    assembled = ToolCallAssembler.assemble(
-                            tool.getHttpUrl(),
-                            tool.getHttpMethod(),
-                            headers,
-                            tool.getTimeoutMs(),
-                            args,
-                            argumentNode,
-                            objectMapper);
-                } catch (RuntimeException ex) {
-                    return new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()));
-                }
-                if (assembled.failed()) {
-                    return new McpCallPrepare.Completed(McpCallResult.error(assembled.errorText()));
-                }
-                return new McpCallPrepare.Ready(assembled.upstream());
-            });
+            if (toolName == null || toolName.isBlank()) {
+                return Mono.just(new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable())));
+            }
+            return requireEnabledServer(serverPath).flatMap(server -> toolRepository
+                    .findByServerCodeAndName(server.getCode(), toolName)
+                    .filter(McpToolEntity::isEnabled)
+                    .map(tool -> assembleCall(tool, arguments))
+                    .defaultIfEmpty(new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()))));
         });
     }
 
@@ -195,15 +155,43 @@ public class DefaultMcpApi implements McpApi {
         return new Outcome.NeedsOutbound(id, ((McpCallPrepare.Ready) prepare).upstream());
     }
 
-    private McpServerEntity requireEnabledServer(String serverPath) {
+    private McpCallPrepare assembleCall(McpToolEntity tool, Map<String, Object> arguments) {
+        JsonNode args;
+        JsonNode headers;
+        try {
+            args = parseArgs(tool.getArgs());
+            headers = parseHeaders(tool.getHttpHeaders());
+        } catch (RuntimeException ex) {
+            return new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()));
+        }
+        JsonNode argumentNode = objectMapper.valueToTree(arguments == null ? Map.of() : arguments);
+        ToolCallAssembler.Result assembled;
+        try {
+            assembled = ToolCallAssembler.assemble(
+                    tool.getHttpUrl(),
+                    tool.getHttpMethod(),
+                    headers,
+                    tool.getTimeoutMs(),
+                    args,
+                    argumentNode,
+                    objectMapper);
+        } catch (RuntimeException ex) {
+            return new McpCallPrepare.Completed(McpCallResult.error(McpFailureTexts.toolUnavailable()));
+        }
+        if (assembled.failed()) {
+            return new McpCallPrepare.Completed(McpCallResult.error(assembled.errorText()));
+        }
+        return new McpCallPrepare.Ready(assembled.upstream());
+    }
+
+    private Mono<McpServerEntity> requireEnabledServer(String serverPath) {
         if (serverPath == null || serverPath.isBlank()) {
-            throw new McpServerNotFoundException(serverPath);
+            return Mono.error(new McpServerNotFoundException(serverPath));
         }
-        McpServerEntity server = serverRepository.findByPath(serverPath).orElse(null);
-        if (server == null || !server.isEnabled()) {
-            throw new McpServerNotFoundException(serverPath);
-        }
-        return server;
+        return serverRepository
+                .findByPath(serverPath)
+                .filter(McpServerEntity::isEnabled)
+                .switchIfEmpty(Mono.error(new McpServerNotFoundException(serverPath)));
     }
 
     private McpDiscoverResult toDiscover(McpServerEntity server) {

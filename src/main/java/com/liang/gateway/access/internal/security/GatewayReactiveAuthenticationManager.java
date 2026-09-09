@@ -2,10 +2,8 @@ package com.liang.gateway.access.internal.security;
 
 import com.liang.gateway.access.AccessPrincipal;
 import com.liang.gateway.access.internal.infrastructure.AccessClock;
-import com.liang.gateway.access.internal.infrastructure.jpa.JpaExecutor;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,19 +16,16 @@ import reactor.core.publisher.Mono;
 @Component
 public class GatewayReactiveAuthenticationManager implements ReactiveAuthenticationManager {
 
-    private final JpaExecutor jpaExecutor;
     private final UserAccessTokenRepository tokenRepository;
     private final UserRepository userRepository;
     private final AccessClock accessClock;
     private final String adminToken;
 
     public GatewayReactiveAuthenticationManager(
-            JpaExecutor jpaExecutor,
             UserAccessTokenRepository tokenRepository,
             UserRepository userRepository,
             AccessClock accessClock,
             @Value("${gateway.admin-token:}") String adminToken) {
-        this.jpaExecutor = jpaExecutor;
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.accessClock = accessClock;
@@ -58,20 +53,18 @@ public class GatewayReactiveAuthenticationManager implements ReactiveAuthenticat
 
     private Mono<Authentication> authenticateAccess(AccessAuthenticationToken authentication) {
         String raw = String.valueOf(authentication.getCredentials());
-        return jpaExecutor
-                .call(() -> tokenRepository.findByAccessToken(raw))
-                .flatMap(optional -> optional
-                        .map(Mono::just)
-                        .orElseGet(() -> Mono.error(new BadCredentialsException("unauthorized"))))
+        return tokenRepository
+                .findByAccessToken(raw)
+                .switchIfEmpty(Mono.error(new BadCredentialsException("unauthorized")))
                 .flatMap(token -> {
                     if (!token.isEnabled() || token.isExpired(accessClock.nowShanghai())) {
                         return Mono.error(new BadCredentialsException("unauthorized"));
                     }
-                    return jpaExecutor
-                            .call(() -> userRepository.findByCode(token.getUserCode()))
-                            .flatMap(userOptional -> {
-                                UserEntity user = userOptional.orElse(null);
-                                if (user == null || !user.isEnabled()) {
+                    return userRepository
+                            .findByCode(token.getUserCode())
+                            .switchIfEmpty(Mono.error(new BadCredentialsException("unauthorized")))
+                            .flatMap(user -> {
+                                if (!user.isEnabled()) {
                                     return Mono.error(new BadCredentialsException("unauthorized"));
                                 }
                                 AccessPrincipal principal = new AccessPrincipal(user.getCode(), token.getCode());

@@ -1,49 +1,40 @@
-package com.liang.gateway.access.internal.infrastructure.jpa;
+package com.liang.gateway.access.internal.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "usage_record")
-public class UsageRecordEntity {
+@Table("usage_record")
+public class UsageRecordEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "code", nullable = false, unique = true, length = 64)
+    @Column("code")
     private String code;
 
-    @Column(name = "token_code", nullable = false, length = 64)
+    @Column("token_code")
     private String tokenCode;
 
-    @Column(name = "user_code", nullable = false, length = 64)
+    @Column("user_code")
     private String userCode;
 
-    @Column(name = "prompt_tokens", nullable = false)
+    @Column("prompt_tokens")
     private long promptTokens;
 
-    @Column(name = "completion_tokens", nullable = false)
+    @Column("completion_tokens")
     private long completionTokens;
 
-    @Column(name = "total_tokens", nullable = false)
+    @Column("total_tokens")
     private long totalTokens;
 
-    @Column(name = "amount_fen", nullable = false)
+    @Column("amount_fen")
     private long amountFen;
 
-    @Column(name = "model", nullable = false, length = 64)
+    @Column("model")
     private String model;
 
-    @Column(name = "request_id", length = 64)
+    @Column("request_id")
     private String requestId;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
     protected UsageRecordEntity() {}
@@ -70,10 +61,6 @@ public class UsageRecordEntity {
         entity.requestId = requestId;
         entity.createTime = createTime;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getCode() {

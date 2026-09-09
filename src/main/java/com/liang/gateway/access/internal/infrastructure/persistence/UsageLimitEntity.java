@@ -1,40 +1,31 @@
-package com.liang.gateway.access.internal.infrastructure.jpa;
+package com.liang.gateway.access.internal.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "usage_limit")
-public class UsageLimitEntity {
+@Table("usage_limit")
+public class UsageLimitEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "user_code", nullable = false, length = 64)
+    @Column("user_code")
     private String userCode;
 
-    @Column(name = "token_code", nullable = false, length = 64)
+    @Column("token_code")
     private String tokenCode;
 
-    @Column(name = "limit_type", nullable = false)
+    @Column("limit_type")
     private int limitType;
 
-    @Column(name = "`usage`", nullable = false)
+    @Column("usage")
     private long usage;
 
-    @Column(name = "used", nullable = false)
+    @Column("used")
     private long used;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "update_time", nullable = false)
+    @Column("update_time")
     private LocalDateTime updateTime;
 
     protected UsageLimitEntity() {}
@@ -50,10 +41,6 @@ public class UsageLimitEntity {
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getUserCode() {

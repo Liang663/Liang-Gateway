@@ -9,15 +9,14 @@ import com.liang.gateway.access.UsageMeta;
 import com.liang.gateway.access.WindowView;
 import com.liang.gateway.access.internal.infrastructure.AccessClock;
 import com.liang.gateway.access.internal.infrastructure.IdentityCodes;
-import com.liang.gateway.access.internal.infrastructure.jpa.JpaExecutor;
-import com.liang.gateway.access.internal.infrastructure.jpa.UsageLimitEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UsageLimitRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UsageRecordEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UsageRecordRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenModelEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenModelRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UsageLimitEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UsageLimitRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UsageRecordEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UsageRecordRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenModelEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenModelRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenRepository;
 import com.liang.gateway.access.internal.infrastructure.redis.WindowSnapshot;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +30,6 @@ public class DefaultAccessApi implements AccessApi {
     static final int LIMIT_FIVE_HOUR = 1;
     static final int LIMIT_WEEK = 2;
 
-    private final JpaExecutor jpaExecutor;
     private final UserAccessTokenRepository tokenRepository;
     private final UsageLimitRepository usageLimitRepository;
     private final UserAccessTokenModelRepository tokenModelRepository;
@@ -40,14 +38,12 @@ public class DefaultAccessApi implements AccessApi {
     private final AccessClock accessClock;
 
     public DefaultAccessApi(
-            JpaExecutor jpaExecutor,
             UserAccessTokenRepository tokenRepository,
             UsageLimitRepository usageLimitRepository,
             UserAccessTokenModelRepository tokenModelRepository,
             UsageRecordRepository usageRecordRepository,
             QuotaWindowStore quotaWindowStore,
             AccessClock accessClock) {
-        this.jpaExecutor = jpaExecutor;
         this.tokenRepository = tokenRepository;
         this.usageLimitRepository = usageLimitRepository;
         this.tokenModelRepository = tokenModelRepository;
@@ -84,7 +80,7 @@ public class DefaultAccessApi implements AccessApi {
             return Mono.error(new AccessBadRequestException("model is required"));
         }
         return loadToken(tokenCode)
-                .then(jpaExecutor.call(() -> tokenModelRepository.existsByTokenCodeAndModel(tokenCode, model)))
+                .then(tokenModelRepository.existsByTokenCodeAndModel(tokenCode, model))
                 .flatMap(allowed -> Boolean.TRUE.equals(allowed)
                         ? Mono.empty()
                         : Mono.error(new ModelForbiddenException("Model is not allowed")));
@@ -93,9 +89,9 @@ public class DefaultAccessApi implements AccessApi {
     @Override
     public Mono<List<String>> listAllowedModels(String tokenCode) {
         return loadToken(tokenCode)
-                .then(jpaExecutor.call(() -> tokenModelRepository.findByTokenCodeOrderByModelAsc(tokenCode).stream()
-                        .map(UserAccessTokenModelEntity::getModel)
-                        .toList()));
+                .thenMany(tokenModelRepository.findByTokenCodeOrderByModelAsc(tokenCode)
+                        .map(UserAccessTokenModelEntity::getModel))
+                .collectList();
     }
 
     @Override
@@ -125,7 +121,8 @@ public class DefaultAccessApi implements AccessApi {
             if (ctx.limit(LIMIT_WEEK) != null) {
                 increments = increments.then(incrementAndPersist(tokenCode, QuotaLayer.WEEK, amountFen, now));
             }
-            return increments.then(jpaExecutor.call(() -> usageRecordRepository.save(UsageRecordEntity.create(
+            return increments.then(usageRecordRepository
+                    .save(UsageRecordEntity.create(
                             IdentityCodes.usageCode(),
                             ctx.token().getCode(),
                             ctx.token().getUserCode(),
@@ -134,7 +131,7 @@ public class DefaultAccessApi implements AccessApi {
                             amountFen,
                             model,
                             safeMeta.requestId(),
-                            accessClock.nowShanghai())))
+                            accessClock.nowShanghai()))
                     .then());
         });
     }
@@ -179,30 +176,29 @@ public class DefaultAccessApi implements AccessApi {
     }
 
     private Mono<Void> persistUsed(String tokenCode, int limitType, long used) {
-        return jpaExecutor.run(() -> usageLimitRepository
+        return usageLimitRepository
                 .findByTokenCodeAndLimitType(tokenCode, limitType)
-                .ifPresent(entity -> {
+                .flatMap(entity -> {
                     entity.updateUsed(used, accessClock.nowShanghai());
-                    usageLimitRepository.save(entity);
-                }));
+                    return usageLimitRepository.save(entity);
+                })
+                .then();
     }
 
     private Mono<TokenContext> loadContext(String tokenCode) {
-        return jpaExecutor.call(() -> {
-            UserAccessTokenEntity token = tokenRepository
-                    .findByCode(tokenCode)
-                    .orElseThrow(() -> new AccessNotFoundException("Access token not found"));
-            List<UsageLimitEntity> limits = usageLimitRepository.findByTokenCodeOrderByLimitTypeAsc(tokenCode);
-            return new TokenContext(token, limits);
-        });
+        return tokenRepository
+                .findByCode(tokenCode)
+                .switchIfEmpty(Mono.error(new AccessNotFoundException("Access token not found")))
+                .flatMap(token -> usageLimitRepository
+                        .findByTokenCodeOrderByLimitTypeAsc(tokenCode)
+                        .collectList()
+                        .map(limits -> new TokenContext(token, limits)));
     }
 
     private Mono<UserAccessTokenEntity> loadToken(String tokenCode) {
-        return jpaExecutor
-                .call(() -> tokenRepository.findByCode(tokenCode))
-                .flatMap(optional -> optional
-                        .map(Mono::just)
-                        .orElseGet(() -> Mono.error(new AccessNotFoundException("Access token not found"))));
+        return tokenRepository
+                .findByCode(tokenCode)
+                .switchIfEmpty(Mono.error(new AccessNotFoundException("Access token not found")));
     }
 
     private static Mono<Void> exceedIfOver(long used, long limit, String message) {

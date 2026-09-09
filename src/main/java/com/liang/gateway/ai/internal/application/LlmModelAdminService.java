@@ -4,10 +4,9 @@ import com.liang.gateway.ai.AiBadRequestException;
 import com.liang.gateway.ai.AiNotFoundException;
 import com.liang.gateway.ai.internal.infrastructure.AiClock;
 import com.liang.gateway.ai.internal.infrastructure.IdentityCodes;
-import com.liang.gateway.ai.internal.infrastructure.jpa.AiJpaExecutor;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmApikeyConfigRepository;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmModelEntity;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmModelRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmApikeyConfigRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmModelEntity;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmModelRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -15,17 +14,12 @@ import reactor.core.publisher.Mono;
 @Service
 public class LlmModelAdminService {
 
-    private final AiJpaExecutor jpaExecutor;
     private final LlmModelRepository modelRepository;
     private final LlmApikeyConfigRepository apikeyRepository;
     private final AiClock aiClock;
 
     public LlmModelAdminService(
-            AiJpaExecutor jpaExecutor,
-            LlmModelRepository modelRepository,
-            LlmApikeyConfigRepository apikeyRepository,
-            AiClock aiClock) {
-        this.jpaExecutor = jpaExecutor;
+            LlmModelRepository modelRepository, LlmApikeyConfigRepository apikeyRepository, AiClock aiClock) {
         this.modelRepository = modelRepository;
         this.apikeyRepository = apikeyRepository;
         this.aiClock = aiClock;
@@ -38,42 +32,37 @@ public class LlmModelAdminService {
             long inputPriceFenPerMillion,
             long outputPriceFenPerMillion,
             boolean enabled) {
-        return jpaExecutor.call(() -> {
+        return Mono.defer(() -> {
             requireText(name, "name");
             requireText(provider, "provider");
             requireText(apikeyCode, "apikeyCode");
             requirePrices(inputPriceFenPerMillion, outputPriceFenPerMillion);
-            requireApikey(apikeyCode);
-            if (modelRepository.findByName(name).isPresent()) {
-                throw new AiBadRequestException("Model name already exists");
-            }
-            LlmModelEntity saved = modelRepository.save(LlmModelEntity.create(
-                    IdentityCodes.modelCode(),
-                    name,
-                    provider,
-                    apikeyCode,
-                    inputPriceFenPerMillion,
-                    outputPriceFenPerMillion,
-                    enabled,
-                    aiClock.nowShanghai()));
-            return toSnapshot(saved);
+            return requireApikey(apikeyCode)
+                    .then(modelRepository.findByName(name))
+                    .flatMap(existing -> Mono.error(new AiBadRequestException("Model name already exists")))
+                    .switchIfEmpty(Mono.defer(() -> modelRepository.save(LlmModelEntity.create(
+                            IdentityCodes.modelCode(),
+                            name,
+                            provider,
+                            apikeyCode,
+                            inputPriceFenPerMillion,
+                            outputPriceFenPerMillion,
+                            enabled,
+                            aiClock.nowShanghai()))))
+                    .cast(LlmModelEntity.class)
+                    .map(LlmModelAdminService::toSnapshot);
         });
     }
 
     public Mono<List<ModelSnapshot>> list() {
-        return jpaExecutor.call(
-                () -> modelRepository.findAllByOrderByCreateTimeDesc().stream()
-                        .map(LlmModelAdminService::toSnapshot)
-                        .toList());
+        return modelRepository.findAllByOrderByCreateTimeDesc().map(LlmModelAdminService::toSnapshot).collectList();
     }
 
     public Mono<ModelSnapshot> get(String code) {
-        return jpaExecutor
-                .call(() -> modelRepository.findByCode(code))
-                .flatMap(optional -> optional
-                        .map(LlmModelAdminService::toSnapshot)
-                        .map(Mono::just)
-                        .orElseGet(() -> Mono.error(new AiNotFoundException("Model not found"))));
+        return modelRepository
+                .findByCode(code)
+                .map(LlmModelAdminService::toSnapshot)
+                .switchIfEmpty(Mono.error(new AiNotFoundException("Model not found")));
     }
 
     public Mono<ModelSnapshot> update(
@@ -84,33 +73,45 @@ public class LlmModelAdminService {
             Long inputPriceFenPerMillion,
             Long outputPriceFenPerMillion,
             Boolean enabled) {
-        return jpaExecutor.call(() -> {
-            LlmModelEntity entity = modelRepository
-                    .findByCode(code)
-                    .orElseThrow(() -> new AiNotFoundException("Model not found"));
-            String nextName = name == null ? entity.getName() : name;
-            String nextProvider = provider == null ? entity.getProvider() : provider;
-            String nextApikey = apikeyCode == null ? entity.getApikeyCode() : apikeyCode;
-            long nextIn = inputPriceFenPerMillion == null
-                    ? entity.getInputPriceFenPerMillion()
-                    : inputPriceFenPerMillion;
-            long nextOut = outputPriceFenPerMillion == null
-                    ? entity.getOutputPriceFenPerMillion()
-                    : outputPriceFenPerMillion;
-            boolean nextEnabled = enabled == null ? entity.isEnabled() : enabled;
-            requireText(nextName, "name");
-            requireText(nextProvider, "provider");
-            requireText(nextApikey, "apikeyCode");
-            requirePrices(nextIn, nextOut);
-            requireApikey(nextApikey);
-            modelRepository.findByName(nextName).ifPresent(existing -> {
-                if (!existing.getCode().equals(code)) {
-                    throw new AiBadRequestException("Model name already exists");
-                }
-            });
-            entity.update(nextName, nextProvider, nextApikey, nextIn, nextOut, nextEnabled, aiClock.nowShanghai());
-            return toSnapshot(modelRepository.save(entity));
-        });
+        return modelRepository
+                .findByCode(code)
+                .switchIfEmpty(Mono.error(new AiNotFoundException("Model not found")))
+                .flatMap(entity -> {
+                    String nextName = name == null ? entity.getName() : name;
+                    String nextProvider = provider == null ? entity.getProvider() : provider;
+                    String nextApikey = apikeyCode == null ? entity.getApikeyCode() : apikeyCode;
+                    long nextIn = inputPriceFenPerMillion == null
+                            ? entity.getInputPriceFenPerMillion()
+                            : inputPriceFenPerMillion;
+                    long nextOut = outputPriceFenPerMillion == null
+                            ? entity.getOutputPriceFenPerMillion()
+                            : outputPriceFenPerMillion;
+                    boolean nextEnabled = enabled == null ? entity.isEnabled() : enabled;
+                    requireText(nextName, "name");
+                    requireText(nextProvider, "provider");
+                    requireText(nextApikey, "apikeyCode");
+                    requirePrices(nextIn, nextOut);
+                    return requireApikey(nextApikey)
+                            .then(modelRepository.findByName(nextName))
+                            .flatMap(existing -> {
+                                if (!existing.getCode().equals(code)) {
+                                    return Mono.error(new AiBadRequestException("Model name already exists"));
+                                }
+                                return Mono.just(entity);
+                            })
+                            .switchIfEmpty(Mono.just(entity))
+                            .flatMap(current -> {
+                                current.update(
+                                        nextName,
+                                        nextProvider,
+                                        nextApikey,
+                                        nextIn,
+                                        nextOut,
+                                        nextEnabled,
+                                        aiClock.nowShanghai());
+                                return modelRepository.save(current).map(LlmModelAdminService::toSnapshot);
+                            });
+                });
     }
 
     static ModelSnapshot toSnapshot(LlmModelEntity entity) {
@@ -126,10 +127,11 @@ public class LlmModelAdminService {
                 entity.getUpdateTime());
     }
 
-    private void requireApikey(String apikeyCode) {
-        if (apikeyRepository.findByCode(apikeyCode).isEmpty()) {
-            throw new AiBadRequestException("Unknown apikey_code");
-        }
+    private Mono<Void> requireApikey(String apikeyCode) {
+        return apikeyRepository
+                .findByCode(apikeyCode)
+                .switchIfEmpty(Mono.error(new AiBadRequestException("Unknown apikey_code")))
+                .then();
     }
 
     private static void requirePrices(long input, long output) {

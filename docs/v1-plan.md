@@ -39,7 +39,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 2. 流式记录 TTFT（发出上游请求到第一帧）与总耗时，写入出站日志；结束后按 `usage` 记 Token 与金额（分），按模型名分组。
 3. 无合法 API Key → 401；超额 → 429；额度 Redis 不可用 → 503。
 4. HTTP API 可配成 MCP Tool；协议 `2026-07-28`：`server/discover` / `tools/list` / `tools/call`；`POST /mcp/{path}`。不做 QPM/限额。工具失败返回具体原因。
-5. 热路径不在 Netty 事件循环上跑 JPA / 同步 JDBC。
+5. 热路径不在 Netty 事件循环上跑 JDBC / JPA。运行时 MySQL 用 R2DBC；Flyway 只在启动期用 JDBC。
 
 **不做**
 
@@ -53,7 +53,6 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 | 谎称 resources/prompts | initialize 只声明 tools |
 | Spring Cloud / SCG / Nacos / Sentinel | 传统网关后置 |
 | Servlet / 虚拟线程当请求处理模型 | 已定为 WebFlux |
-| R2DBC | 配置仍 JPA |
 | Spring AI / LangChain4j | 协议转发 |
 | Wasm / xDS / 对外 SPI | 改源码扩展 |
 | 管理台 UI | 少量管理 HTTP |
@@ -71,7 +70,7 @@ Java AI 网关：路由 + 过滤器链 + 反向代理（Chat 转到 DeepSeek）+
 | 出站 | `WebClient`，归 `core` 的反代；mcp 出站也可使用 |
 | 鉴权 | Spring Security WebFlux，归 `access` |
 | 过滤器 / 路由 / 反代 | `core`，见 [spec-gateway-core.md](spec-gateway-core.md) |
-| 配置库 | MySQL 8 + JPA + Flyway（access / mcp） |
+| 配置库 | MySQL 8 + R2DBC + Flyway（JDBC 仅启动期；access / ai） |
 | 计数 | Reactive Redis，归 `access` |
 | 测试 | JUnit 5、AssertJ、WebTestClient、Modulith verify |
 | 禁止 | Spring AI、LangChain4j、Spring Cloud*、SCG、Sentinel、Lombok |
@@ -107,7 +106,7 @@ orchestration    core, access, ai           数据面流程：组合 + Chat 收�
 
 **表：** Chat/调用方见 [sql-gateway-user.md](sql-gateway-user.md)；MCP 见 [sql-gateway-mcp.md](sql-gateway-mcp.md)。归 ai。
 
-**线程：** 事件循环只做非阻塞。JPA 必须 `boundedElastic`。
+**线程：** 事件循环只做非阻塞。运行时 MySQL 用 R2DBC；Flyway 只在启动期用 JDBC。
 
 ---
 
@@ -115,7 +114,7 @@ orchestration    core, access, ai           数据面流程：组合 + Chat 收�
 
 1–6 已完成：领域划分、四模块 verify、core、access（含金额/授权）、ai Chat 与 MCP API、orchestration 数据面。
 
-进行中：MCP JSON-RPC 下沉（[plan-gateway-mcp-protocol.md](plan-gateway-mcp-protocol.md)）。剩余产品项：种子数据、补测试。
+进行中：运行时 MySQL 换 R2DBC（[plan-gateway-r2dbc.md](plan-gateway-r2dbc.md)）。剩余产品项：种子数据、补测试。
 
 ---
 
@@ -142,4 +141,4 @@ orchestration    core, access, ai           数据面流程：组合 + Chat 收�
 3. 不要提交 `config/application-local.yml`。
 4. 不要独立 `llm` / `mcp` / `metering` / `admin` / `infrastructure` 包。业务域不要互相依赖。
 5. `core` / `access` / `ai` 不得互相 import；只有 `orchestration` 依赖这三者。数据面不得实现配额、拷流、工具参数映射；MCP JSON-RPC 信封与 method 分发在 `McpApi`。禁止再增加第二个编排模块。
-6. 流式禁止 `collectList` / `block`。热路径禁止同步 JPA。
+6. 流式禁止 `collectList` / `block`。运行时禁止 JDBC/JPA；Flyway 仅启动期。

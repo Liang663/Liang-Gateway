@@ -1,7 +1,7 @@
 # SQL｜MCP 服务器与工具
 
 > 文件名：`sql-gateway-mcp.md`  
-> 定位：MCP 相关表的结构、关系、约束真相源。执行源是 Flyway。
+> 定位：MCP 相关表的结构、关系、约束真相源。执行源是 Flyway。运行时访问是 R2DBC。
 
 ## 1. 背景与范围
 

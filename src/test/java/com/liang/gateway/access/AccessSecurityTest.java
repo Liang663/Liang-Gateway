@@ -2,10 +2,10 @@ package com.liang.gateway.access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserAccessTokenRepository;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserEntity;
-import com.liang.gateway.access.internal.infrastructure.jpa.UserRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserAccessTokenRepository;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserEntity;
+import com.liang.gateway.access.internal.infrastructure.persistence.UserRepository;
 import com.liang.gateway.support.TestTokens;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
@@ -107,24 +107,30 @@ class AccessSecurityTest {
         LocalDateTime now = LocalDateTime.of(2026, 9, 3, 10, 0, 0);
 
         String disabledUser = "usr_dis_" + System.nanoTime();
-        userRepository.save(UserEntity.create(disabledUser, "disabled", "DATA", false, now));
+        userRepository.save(UserEntity.create(disabledUser, "disabled", "DATA", false, now)).block();
         String disabledUserToken = "at_dis_user_" + System.nanoTime();
-        tokenRepository.save(UserAccessTokenEntity.create(
-                "tok_dis_user_" + System.nanoTime(), disabledUser, disabledUserToken, true, null, 10, now));
+        tokenRepository
+                .save(UserAccessTokenEntity.create(
+                        "tok_dis_user_" + System.nanoTime(), disabledUser, disabledUserToken, true, null, 10, now))
+                .block();
 
         String enabledUser = "usr_en_" + System.nanoTime();
-        userRepository.save(UserEntity.create(enabledUser, "enabled", "DATA", true, now));
+        userRepository.save(UserEntity.create(enabledUser, "enabled", "DATA", true, now)).block();
         String disabledToken = "at_dis_tok_" + System.nanoTime();
-        tokenRepository.save(UserAccessTokenEntity.create(
-                "tok_dis_tok_" + System.nanoTime(), enabledUser, disabledToken, false, null, 10, now));
+        tokenRepository
+                .save(UserAccessTokenEntity.create(
+                        "tok_dis_tok_" + System.nanoTime(), enabledUser, disabledToken, false, null, 10, now))
+                .block();
         String expiredToken = "at_exp_" + System.nanoTime();
-        tokenRepository.save(UserAccessTokenEntity.create(
-                "tok_exp_" + System.nanoTime(), enabledUser, expiredToken, true, now.minusDays(1), 10, now));
+        tokenRepository
+                .save(UserAccessTokenEntity.create(
+                        "tok_exp_" + System.nanoTime(), enabledUser, expiredToken, true, now.minusDays(1), 10, now))
+                .block();
 
         assertUnauthorized(disabledUserToken);
         assertUnauthorized(disabledToken);
         assertUnauthorized(expiredToken);
-        assertThat(tokenRepository.findByAccessToken(expiredToken).orElseThrow().isExpired(now)).isTrue();
+        assertThat(tokenRepository.findByAccessToken(expiredToken).block().isExpired(now)).isTrue();
     }
 
     @Test

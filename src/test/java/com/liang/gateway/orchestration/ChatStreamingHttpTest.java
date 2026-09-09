@@ -6,8 +6,8 @@ import com.liang.gateway.access.internal.application.TokenAdminService;
 import com.liang.gateway.access.internal.application.UserAdminService;
 import com.liang.gateway.ai.internal.application.LlmApikeyAdminService;
 import com.liang.gateway.ai.internal.application.LlmModelAdminService;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogEntity;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogEntity;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogRepository;
 import com.liang.gateway.orchestration.ChatTestSupport.Catalog;
 import java.io.IOException;
 import java.time.Duration;
@@ -131,7 +131,8 @@ class ChatStreamingHttpTest {
 
         assertThat(waitForUsage(catalog.tokenCode())).isEqualTo(1L);
         assertThat(usageAmount(catalog.tokenCode())).isEqualTo(200L);
-        List<LlmCallLogEntity> logs = callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(catalog.apikeyCode());
+        List<LlmCallLogEntity> logs =
+                callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(catalog.apikeyCode()).collectList().block();
         assertThat(logs).isNotEmpty();
         assertThat(logs.getFirst().isSuccess()).isTrue();
         assertThat(logs.getFirst().getFirstTokenMs()).isNotNull();

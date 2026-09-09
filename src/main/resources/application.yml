@@ -4,13 +4,9 @@ server:
 spring:
   config:
     import: optional:file:./config/application-local.yml
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: none
-    properties:
-      hibernate:
-        auto_quote_keyword: true
+  datasource:
+    hikari:
+      maximum-pool-size: 2
   data:
     redis:
       repositories:

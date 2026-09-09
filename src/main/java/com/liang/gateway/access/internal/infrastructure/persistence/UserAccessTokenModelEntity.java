@@ -1,28 +1,19 @@
-package com.liang.gateway.access.internal.infrastructure.jpa;
+package com.liang.gateway.access.internal.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "user_access_token_model")
-public class UserAccessTokenModelEntity {
+@Table("user_access_token_model")
+public class UserAccessTokenModelEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "token_code", nullable = false, length = 64)
+    @Column("token_code")
     private String tokenCode;
 
-    @Column(name = "model", nullable = false, length = 64)
+    @Column("model")
     private String model;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
     protected UserAccessTokenModelEntity() {}
@@ -33,10 +24,6 @@ public class UserAccessTokenModelEntity {
         entity.model = model;
         entity.createTime = createTime;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getTokenCode() {

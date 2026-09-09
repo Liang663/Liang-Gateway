@@ -1,55 +1,46 @@
-package com.liang.gateway.ai.internal.mcp.infrastructure.jpa;
+package com.liang.gateway.ai.internal.mcp.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "mcp_tool")
-public class McpToolEntity {
+@Table("mcp_tool")
+public class McpToolEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "code", nullable = false, unique = true, length = 64)
+    @Column("code")
     private String code;
 
-    @Column(name = "server_code", nullable = false, length = 64)
+    @Column("server_code")
     private String serverCode;
 
-    @Column(name = "name", nullable = false, length = 128)
+    @Column("name")
     private String name;
 
-    @Column(name = "description", nullable = false, length = 512)
+    @Column("description")
     private String description;
 
-    @Column(name = "http_url", nullable = false, length = 512)
+    @Column("http_url")
     private String httpUrl;
 
-    @Column(name = "http_method", nullable = false, length = 16)
+    @Column("http_method")
     private String httpMethod;
 
-    @Column(name = "http_headers", columnDefinition = "TEXT")
+    @Column("http_headers")
     private String httpHeaders;
 
-    @Column(name = "timeout_ms", nullable = false)
+    @Column("timeout_ms")
     private int timeoutMs;
 
-    @Column(name = "args", nullable = false, columnDefinition = "TEXT")
+    @Column("args")
     private String args;
 
-    @Column(name = "enabled", nullable = false)
+    @Column("enabled")
     private boolean enabled;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "update_time", nullable = false)
+    @Column("update_time")
     private LocalDateTime updateTime;
 
     protected McpToolEntity() {}
@@ -80,10 +71,6 @@ public class McpToolEntity {
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getCode() {

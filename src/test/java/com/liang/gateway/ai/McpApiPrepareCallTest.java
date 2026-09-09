@@ -7,8 +7,8 @@ import com.liang.gateway.ai.internal.mcp.application.McpServerAdminService;
 import com.liang.gateway.ai.internal.mcp.application.McpServerSnapshot;
 import com.liang.gateway.ai.internal.mcp.application.McpToolAdminService;
 import com.liang.gateway.ai.internal.mcp.infrastructure.McpIdentityCodes;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolEntity;
-import com.liang.gateway.ai.internal.mcp.infrastructure.jpa.McpToolRepository;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolEntity;
+import com.liang.gateway.ai.internal.mcp.infrastructure.persistence.McpToolRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -117,7 +117,8 @@ class McpApiPrepareCallTest {
                 30000,
                 "[{\"name\":\"userId\",\"value_type\":\"string\",\"required\":true,\"position\":\"path\"}]",
                 true,
-                aiClock.nowShanghai()));
+                aiClock.nowShanghai()))
+                .block();
         StepVerifier.create(mcpApi.prepareCall(mismatchPath, "mismatch", Map.of("userId", "u1")))
                 .assertNext(prepare -> assertErrorPrefix(prepare, "path_mismatch:"))
                 .verifyComplete();

@@ -30,7 +30,7 @@
 
 - 注册中心、LB、熔断、重试矩阵、动态路由表、路径改写 DSL、WebSocket、Spring Cloud Gateway。
 - 数据面业务入口（在 `orchestration`）。
-- API Key、额度、Token 计数、Redis、JPA。
+- API Key、额度、Token 计数、Redis、持久化。
 - OpenAI 语义、TTFT、usage 解析、MCP、DeepSeek 专用逻辑。
 - 内容审核与脱敏。
 

@@ -1,46 +1,37 @@
-package com.liang.gateway.ai.internal.infrastructure.jpa;
+package com.liang.gateway.ai.internal.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "llm_call_log")
-public class LlmCallLogEntity {
+@Table("llm_call_log")
+public class LlmCallLogEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "code", nullable = false, unique = true, length = 64)
+    @Column("code")
     private String code;
 
-    @Column(name = "llm_apikey_code", nullable = false, length = 64)
+    @Column("llm_apikey_code")
     private String llmApikeyCode;
 
-    @Column(name = "model", nullable = false, length = 64)
+    @Column("model")
     private String model;
 
-    @Column(name = "success", nullable = false)
+    @Column("success")
     private boolean success;
 
-    @Column(name = "message", length = 512)
+    @Column("message")
     private String message;
 
-    @Column(name = "first_token_ms")
+    @Column("first_token_ms")
     private Integer firstTokenMs;
 
-    @Column(name = "total_duration_ms", nullable = false)
+    @Column("total_duration_ms")
     private int totalDurationMs;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "update_time", nullable = false)
+    @Column("update_time")
     private LocalDateTime updateTime;
 
     protected LlmCallLogEntity() {}
@@ -65,10 +56,6 @@ public class LlmCallLogEntity {
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getCode() {

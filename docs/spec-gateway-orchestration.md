@@ -72,7 +72,7 @@
 
 - 只允许依赖 core、access、ai。禁止再增加编排模块。
 - 禁止 `block()`；流式禁止 `collectList`。
-- 禁止写 Lua、JPA Entity、解析 DeepSeek usage、解析 OpenAPI、实现工具 args、拼 `-326xx`。
+- 禁止写 Lua、持久化实体、解析 DeepSeek usage、解析 OpenAPI、实现工具 args、拼 `-326xx`。
 - 结构验证：orchestration 依赖三者；不反向被依赖。
 
 ## 7. 验收标准

@@ -1,49 +1,40 @@
-package com.liang.gateway.ai.internal.infrastructure.jpa;
+package com.liang.gateway.ai.internal.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "llm_apikey_config")
-public class LlmApikeyConfigEntity {
+@Table("llm_apikey_config")
+public class LlmApikeyConfigEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "code", nullable = false, unique = true, length = 64)
+    @Column("code")
     private String code;
 
-    @Column(name = "name", nullable = false, length = 128)
+    @Column("name")
     private String name;
 
-    @Column(name = "provider", nullable = false, length = 32)
+    @Column("provider")
     private String provider;
 
-    @Column(name = "base_url", nullable = false, length = 256)
+    @Column("base_url")
     private String baseUrl;
 
-    @Column(name = "secret", nullable = false, length = 512)
+    @Column("secret")
     private String secret;
 
-    @Column(name = "prefix", nullable = false, length = 16)
+    @Column("prefix")
     private String prefix;
 
-    @Column(name = "enabled", nullable = false)
+    @Column("enabled")
     private boolean enabled;
 
-    @Column(name = "expire_time")
+    @Column("expire_time")
     private LocalDateTime expireTime;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "update_time", nullable = false)
+    @Column("update_time")
     private LocalDateTime updateTime;
 
     protected LlmApikeyConfigEntity() {}
@@ -70,10 +61,6 @@ public class LlmApikeyConfigEntity {
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getCode() {

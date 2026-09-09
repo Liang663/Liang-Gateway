@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.liang.gateway.ai.internal.application.ApikeySnapshot;
 import com.liang.gateway.ai.internal.application.LlmApikeyAdminService;
-import com.liang.gateway.ai.internal.infrastructure.jpa.LlmCallLogRepository;
+import com.liang.gateway.ai.internal.infrastructure.persistence.LlmCallLogRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,7 +59,7 @@ class ChatApiCallLogTest {
                 })
                 .verifyComplete();
 
-        var rows = callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(key.code());
+        var rows = callLogRepository.findByLlmApikeyCodeOrderByCreateTimeDesc(key.code()).collectList().block();
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.getMessage()).doesNotContain(SECRET);

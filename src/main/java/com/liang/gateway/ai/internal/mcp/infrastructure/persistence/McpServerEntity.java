@@ -1,43 +1,34 @@
-package com.liang.gateway.ai.internal.mcp.infrastructure.jpa;
+package com.liang.gateway.ai.internal.mcp.infrastructure.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "mcp_server")
-public class McpServerEntity {
+@Table("mcp_server")
+public class McpServerEntity extends PersistableRow {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "code", nullable = false, unique = true, length = 64)
+    @Column("code")
     private String code;
 
-    @Column(name = "name", nullable = false, length = 128)
+    @Column("name")
     private String name;
 
-    @Column(name = "path", nullable = false, unique = true, length = 64)
+    @Column("path")
     private String path;
 
-    @Column(name = "description", length = 512)
+    @Column("description")
     private String description;
 
-    @Column(name = "version", nullable = false, length = 32)
+    @Column("version")
     private String version;
 
-    @Column(name = "enabled", nullable = false)
+    @Column("enabled")
     private boolean enabled;
 
-    @Column(name = "create_time", nullable = false)
+    @Column("create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "update_time", nullable = false)
+    @Column("update_time")
     private LocalDateTime updateTime;
 
     protected McpServerEntity() {}
@@ -60,10 +51,6 @@ public class McpServerEntity {
         entity.createTime = now;
         entity.updateTime = now;
         return entity;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getCode() {
