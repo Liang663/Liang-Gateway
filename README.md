@@ -47,3 +47,9 @@ curl http://127.0.0.1:8080/health
 - 协作约定与文档路由：[AGENTS.md](./AGENTS.md)
 - 第一版做 / 不做：[docs/v1-plan.md](./docs/v1-plan.md)
 - 领域切分：[docs/references/domains.md](./docs/references/domains.md)
+
+## License
+
+Copyright 2026 Liang663.
+
+Licensed under the [Apache License 2.0](./LICENSE).
