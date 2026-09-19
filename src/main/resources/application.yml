@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8880
 
 spring:
   config:
@@ -7,6 +7,11 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 2
+  # R2DBC disables JDBC DataSource auto-configuration. Flyway owns this startup-only JDBC connection.
+  flyway:
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
   data:
     redis:
       repositories:
@@ -17,6 +22,7 @@ gateway:
     connect-timeout: 5s
     response-timeout: 120s
     max-in-memory-size: 16MB
+    max-connections: 4096
   quota:
     key-prefix: gw:quota
   mcp:

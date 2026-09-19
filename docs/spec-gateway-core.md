@@ -65,7 +65,7 @@
 
 ## 5. 设计重点
 
-- 运行时：Spring WebFlux + Reactor Netty。
+- 运行时：Spring WebFlux + Reactor Netty。出站 WebClient 连接池可配（`gateway.proxy.max-connections`），长 SSE 不能吃默认 500 上限。
 - 一次 AI 调用的**顺序编排在 `orchestration`**：调 access 额度、调 ai 协议、调 core 转发。core 只被调，不调另外两个。Chat/MCP 走显式转发，不把业务语义塞进过滤器。
 - Security 只解决进门；额度是 access 的 API，由 orchestration 显式调用。
 - 不预留空的动态路由 / LB 接口。

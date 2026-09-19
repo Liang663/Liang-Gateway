@@ -17,7 +17,7 @@ public class GatewayAuthenticationConverter implements ServerAuthenticationConve
     @Override
     public Mono<Authentication> convert(ServerWebExchange exchange) {
         String path = exchange.getRequest().getPath().pathWithinApplication().value();
-        if ("/health".equals(path)) {
+        if ("/health".equals(path) || "/console".equals(path) || path.startsWith("/console/")) {
             return Mono.empty();
         }
         if (path.startsWith("/admin")) {

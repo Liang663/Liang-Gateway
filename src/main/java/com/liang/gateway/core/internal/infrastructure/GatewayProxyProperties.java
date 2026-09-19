@@ -10,6 +10,7 @@ public class GatewayProxyProperties {
     private Duration connectTimeout = Duration.ofSeconds(5);
     private Duration responseTimeout = Duration.ofSeconds(120);
     private DataSize maxInMemorySize = DataSize.ofMegabytes(16);
+    private int maxConnections = 4096;
 
     public Duration getConnectTimeout() {
         return connectTimeout;
@@ -33,5 +34,13 @@ public class GatewayProxyProperties {
 
     public void setMaxInMemorySize(DataSize maxInMemorySize) {
         this.maxInMemorySize = maxInMemorySize;
+    }
+
+    public int getMaxConnections() {
+        return maxConnections;
+    }
+
+    public void setMaxConnections(int maxConnections) {
+        this.maxConnections = maxConnections;
     }
 }

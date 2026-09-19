@@ -18,6 +18,7 @@
 | `docs/plan-gateway-r2dbc.md` | 运行时 MySQL 从 JPA 换成 R2DBC（进行中） |
 | `docs/sql-gateway-user.md` | 用户、令牌、限额、模型、用量、出站日志表结构 |
 | `docs/sql-gateway-mcp.md` | MCP 服务器与工具表结构 |
+| `docs/dev-ops/seed-local.sql` | 本地联用演示数据（只打 `liang_gateway`） |
 | `config/application-local.yml.example` | 本地机密模板；真文件 gitignore |
 
 进行中的落地计划才进导航。第一版领域 Plan 已吸收进对应 Spec。

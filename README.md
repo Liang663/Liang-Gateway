@@ -33,6 +33,8 @@ curl http://127.0.0.1:8080/health
 
 数据面（需合法访问令牌）：`POST /v1/chat/completions`、`GET /v1/models`、`POST /mcp/{path}`。
 
+本地联用可在 Flyway 建表后执行 [docs/dev-ops/seed-local.sql](./docs/dev-ops/seed-local.sql)（只打 `liang_gateway`）。演示 MCP：`POST /mcp/demo`，令牌 `lgw_demo_mcp_token`。
+
 ## 模块概览
 
 - `core`：过滤器链、单 URL 反代、Health

@@ -10,6 +10,10 @@ spring:
     url: r2dbc:mysql://127.0.0.1:3307/liang_gateway_test?connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
     username: root
     password: liang
+  flyway:
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
   data:
     redis:
       host: 127.0.0.1

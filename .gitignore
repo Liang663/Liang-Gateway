@@ -45,3 +45,10 @@ config/application-local.yml
 .env
 .env.local
 .env.*.local
+
+### Management console ###
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+/jmeter.log

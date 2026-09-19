@@ -34,7 +34,7 @@ public class AccessSecurityConfig {
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .exceptionHandling(spec -> spec.authenticationEntryPoint(entryPoint))
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/health")
+                        .pathMatchers("/health", "/console", "/console/**")
                         .permitAll()
                         .pathMatchers("/admin/**")
                         .authenticated()

@@ -1,0 +1,27 @@
+{
+  "name": "liang-gateway-console",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "vue": "^3.5.0",
+    "vue-router": "^4.6.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "prettier": "^3.9.8",
+    "typescript": "~5.9.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.11",
+    "vue-tsc": "^3.1.0"
+  }
+}

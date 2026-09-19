@@ -114,7 +114,7 @@ orchestration    core, access, ai           数据面流程：组合 + Chat 收�
 
 1–6 已完成：领域划分、四模块 verify、core、access（含金额/授权）、ai Chat 与 MCP API、orchestration 数据面。
 
-进行中：运行时 MySQL 换 R2DBC（[plan-gateway-r2dbc.md](plan-gateway-r2dbc.md)）。剩余产品项：种子数据、补测试。
+进行中：运行时 MySQL 换 R2DBC（[plan-gateway-r2dbc.md](plan-gateway-r2dbc.md)）。本地演示种子：[seed-local.sql](dev-ops/seed-local.sql)。剩余产品项：补测试。
 
 ---
 

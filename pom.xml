@@ -19,6 +19,7 @@
     <properties>
         <java.version>21</java.version>
         <spring-modulith.version>2.1.1</spring-modulith.version>
+        <frontend.npm.executable>npm</frontend.npm.executable>
     </properties>
 
     <dependencyManagement>
@@ -134,4 +135,69 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>frontend-windows</id>
+            <activation>
+                <os><family>Windows</family></os>
+            </activation>
+            <properties>
+                <frontend.npm.executable>npm.cmd</frontend.npm.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>frontend</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <configuration>
+                            <executable>${frontend.npm.executable}</executable>
+                            <workingDirectory>${project.basedir}/frontend</workingDirectory>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>frontend-install</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <arguments><argument>ci</argument></arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>frontend-build</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <arguments><argument>run</argument><argument>build</argument></arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>package-console</id>
+                                <phase>process-resources</phase>
+                                <goals><goal>copy-resources</goal></goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.outputDirectory}/static/console</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/frontend/dist</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

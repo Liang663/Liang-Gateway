@@ -148,6 +148,7 @@ CREATE TABLE `mcp_tool` (
 
 - 执行源：Flyway，建议 `V3__mcp_server_tool.sql`（V1 用户令牌，V2 金额与 Chat 模型）。
 - 空库可从 V1+V2+V3 起出。无回填。
+- 本地联用演示数据：`docs/dev-ops/seed-local.sql`，不是 Flyway，只打 `liang_gateway`。
 - 回滚：DROP `mcp_tool`、`mcp_server`。
 
 ## 7. 验证

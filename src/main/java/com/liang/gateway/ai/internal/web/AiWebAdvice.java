@@ -9,7 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = {AdminLlmApikeyController.class, AdminLlmModelController.class})
+@RestControllerAdvice(assignableTypes = {
+    AdminLlmApikeyController.class, AdminLlmModelController.class, AdminLlmQueryController.class
+})
 public class AiWebAdvice {
 
     @ExceptionHandler(AiNotFoundException.class)
